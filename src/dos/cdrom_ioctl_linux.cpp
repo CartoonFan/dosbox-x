@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -88,13 +88,9 @@ bool CDROM_Interface_Ioctl::SetDevice(char* path, int forceCD)
 	bool success = CDROM_Interface_SDL::SetDevice(path, forceCD);
 	
 	if (success) {
-#if defined(C_SDL2)
-        strcpy(device_name, "unknown");
-#else
 		const char* tmp = SDL_CDName(forceCD);
 		if (tmp) safe_strncpy(device_name, tmp, 512);
 		else success = false;
-#endif
 	}
 	
 	return success;

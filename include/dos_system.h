@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -149,9 +149,7 @@ public:
 	bool Write(const uint8_t * data,uint16_t * size);
 	bool Seek(uint32_t * pos,uint32_t type);
 	bool Close();
-#ifdef WIN32
 	bool LockFile(uint8_t mode, uint32_t pos, uint16_t size);
-#endif
 	uint16_t GetInformation(void);
 	bool UpdateDateTimeFromHost(void);
 	bool UpdateLocalDateTime(void);

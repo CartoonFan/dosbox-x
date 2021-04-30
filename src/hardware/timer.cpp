@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -326,6 +326,10 @@ static void PIT0_Event(Bitu /*val*/) {
 
         PIC_AddEvent(PIT0_Event,pit[0].delay - (err * 0.05));
 	}
+}
+
+uint32_t PIT0_GetAssignedCounter(void) {
+    return pit[0].cntr;
 }
 
 static bool counter_output(Bitu counter) {

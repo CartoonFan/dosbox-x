@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -507,7 +507,9 @@ void DrawCursor() {
 
     // Check video page. Seems to be ignored for text mode. 
     // hence the text mode handled above this
-    if (real_readb(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE)!=mouse.page) return;
+    // >>> removed because BIOS page is not actual page in some cases, e.g. QQP games
+    // if (real_readb(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE)!=mouse.page) return;
+
 // Check if cursor in update region
 /*  if ((POS_X >= mouse.updateRegion_x[0]) && (POS_X <= mouse.updateRegion_x[1]) &&
         (POS_Y >= mouse.updateRegion_y[0]) && (POS_Y <= mouse.updateRegion_y[1])) {
@@ -591,6 +593,11 @@ static inline bool GFX_IsFullscreen(void) {
 }
 #endif
 
+void KEYBOARD_AUX_LowerIRQ() {
+    if (MOUSE_IRQ != 0)
+        PIC_SetIRQMask(MOUSE_IRQ,false);
+}
+
 extern int  user_cursor_x,  user_cursor_y;
 extern int  user_cursor_sw, user_cursor_sh;
 extern bool user_cursor_locked;
@@ -635,7 +642,7 @@ void Mouse_CursorMoved(float xrel,float yrel,float x,float y,bool emulate) {
     } else if (CurMode != NULL) {
         if (CurMode->type == M_TEXT) {
             mouse.x = x*real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS)*8;
-            mouse.y = y*(real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1)*8;
+            mouse.y = y*(IS_EGAVGA_ARCH?(real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1):25)*8;
         /* NTS: DeluxePaint II enhanced sets a large range (5112x3832) for VGA mode 0x12 640x480 16-color */
         } else {
             if ((mouse.max_x > 0) && (mouse.max_y > 0)) {
@@ -707,7 +714,7 @@ uint8_t Mouse_GetButtonState(void) {
     return mouse.buttons;
 }
 
-#if defined(WIN32) || defined(C_SDL2)
+#if defined(WIN32) || defined(MACOSX) || defined(C_SDL2)
 #include "render.h"
 char text[5000];
 const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint16_t *textlen) {
@@ -721,7 +728,13 @@ const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint
 		c=real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 		r=(uint16_t)real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
 	}
-	int c1=c*x1/w, r1=r*y1/h, c2=c*x2/w, r2=r*y2/h, t;
+    int c1=x1, r1=y1, c2=x2, r2=y2, t;
+    if (w>0&&h>0) {
+        c1=c*x1/w;
+        r1=r*y1/h;
+        c2=c*x2/w;
+        r2=r*y2/h;
+    }
 	if (c1>c2) {
 		t=c1;
 		c1=c2;
@@ -769,16 +782,22 @@ const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint
 }
 
 void Mouse_Select(int x1, int y1, int x2, int y2, int w, int h, bool select) {
-	uint8_t page = real_readb(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
-	uint16_t c=0, r=0;
-	if (IS_PC98_ARCH) {
-		c=80;
-		r=real_readb(0x60,0x113) & 0x01 ? 25 : 20;
-	} else {
-		c=real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS);
-		r=(uint16_t)real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
-	}
-	int c1=c*x1/w, r1=r*y1/h, c2=c*x2/w, r2=r*y2/h, t;
+    int c1=x1, r1=y1, c2=x2, r2=y2, t;
+    uint8_t page = real_readb(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
+    uint16_t c=0, r=0;
+    if (IS_PC98_ARCH) {
+        c=80;
+        r=real_readb(0x60,0x113) & 0x01 ? 25 : 20;
+    } else {
+        c=real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+        r=(uint16_t)real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS)+1;
+    }
+    if (w>0&&h>0) {
+        c1=c*x1/w;
+        r1=r*y1/h;
+        c2=c*x2/w;
+        r2=r*y2/h;
+    }
 	if (c1>c2) {
 		t=c1;
 		c1=c2;
@@ -790,7 +809,7 @@ void Mouse_Select(int x1, int y1, int x2, int y2, int w, int h, bool select) {
 		r2=t;
 	}
 #if defined(USE_TTF)
-    if (ttf.inUse&&!IS_EGAVGA_ARCH) {
+    if (ttf.inUse&&(!IS_EGAVGA_ARCH||CurMode->mode!=3)) {
         ttf_cell *newAC = newAttrChar;
         for (int y = 0; y < ttf.lins; y++) {
             if (y>=r1&&y<=r2)
@@ -1030,7 +1049,7 @@ void Mouse_AfterNewVideoMode(bool setmode) {
             mouse.max_y = 400 - 1;
         }
         else {
-            Bitu rows = real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS);
+            Bitu rows = IS_EGAVGA_ARCH?real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS):24;
             if ((rows == 0) || (rows > 250)) rows = 25 - 1;
             mouse.max_y = 8*(rows+1) - 1;
         }
@@ -1142,6 +1161,14 @@ static void Mouse_Reset(void) {
     mouse.in_UIR = false;
 }
 
+static void Mouse_Used(void) {
+    static bool autolock_enabled = false;
+    if(!autolock_enabled) {
+        Mouse_AutoLock(true);
+        autolock_enabled = true;
+    }
+}
+
 static Bitu INT33_Handler(void) {
 //  LOG(LOG_MOUSE,LOG_NORMAL)("MOUSE: %04X %X %X %d %d",reg_ax,reg_bx,reg_cx,POS_X,POS_Y);
     switch (reg_ax) {
@@ -1151,8 +1178,8 @@ static Bitu INT33_Handler(void) {
     case 0x01:  /* Show Mouse */
         if (mouse.hidden) mouse.hidden--;
         mouse.updateRegion_y[1] = -1; //offscreen
-        Mouse_AutoLock(true);
         DrawCursor();
+        if(!mouse.hidden) Mouse_Used();
         break;
     case 0x02:  /* Hide Mouse */
         {
@@ -1169,6 +1196,7 @@ static Bitu INT33_Handler(void) {
         mouse.first_range_setx = false;
         mouse.first_range_sety = false;
         if (en_int33_hide_if_polling) int33_last_poll = PIC_FullIndex();
+        Mouse_Used();
         break;
     case 0x04:  /* Position Mouse */
         /* If position isn't different from current position
@@ -1194,8 +1222,9 @@ static Bitu INT33_Handler(void) {
             reg_bx = mouse.times_pressed[but];
             mouse.times_pressed[but] = 0;
             if (en_int33_hide_if_polling) int33_last_poll = PIC_FullIndex();
-            break;
         }
+        Mouse_Used();
+        break;
     case 0x06:  /* Return Button Release Data */
         {
             uint16_t but = reg_bx;
@@ -1206,8 +1235,9 @@ static Bitu INT33_Handler(void) {
             reg_bx = mouse.times_released[but];
             mouse.times_released[but] = 0;
             if (en_int33_hide_if_polling) int33_last_poll = PIC_FullIndex();
-            break;
         }
+        Mouse_Used();
+        break;
     case 0x07:  /* Define horizontal cursor range */
         {
             //Lemmings sets 1-640 and wants that. Ironseed sets 0-640 but doesn't like 640
@@ -1361,13 +1391,14 @@ static Bitu INT33_Handler(void) {
             reg_dx = (uint16_t)static_cast<int16_t>(locked ? mouse.mickey_y : 0);
             mouse.mickey_x = 0;
             mouse.mickey_y = 0;
+            Mouse_Used();
             break;
         }
     case 0x0c:  /* Define interrupt subroutine parameters */
         mouse.sub_mask = reg_cx;
         mouse.sub_seg = SegValue(es);
         mouse.sub_ofs = reg_dx;
-        Mouse_AutoLock(true); //Some games don't seem to reset the mouse before using
+        if(mouse.sub_mask) Mouse_Used();
         break;
     case 0x0d:  /* Mouse light pen emulation on */
         LOG(LOG_MOUSE, LOG_ERROR)("Mouse light pen emulation on not implemented");
@@ -1473,7 +1504,7 @@ static Bitu INT33_Handler(void) {
             reg_ax = 0xffff;
             reg_bx = MOUSE_BUTTONS;
             Mouse_Reset();
-            Mouse_AutoLock(true);
+            Mouse_Used();
             AUX_INT33_Takeover();
             LOG(LOG_MOUSE, LOG_NORMAL)("INT 33h reset");
         }

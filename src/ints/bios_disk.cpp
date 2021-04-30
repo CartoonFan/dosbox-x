@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -133,6 +133,7 @@ void incrementFDD(void) {
         equipment|=(numofdisks<<6);
     } else equipment|=1;
     mem_writew(BIOS_CONFIGURATION,equipment);
+    if(IS_EGAVGA_ARCH) equipment &= ~0x30; //EGA/VGA startup display mode differs in CMOS
     CMOS_SetRegister(0x14, (uint8_t)(equipment&0xff));
 }
 
@@ -723,6 +724,8 @@ void IDE_ResetDiskByBIOS(unsigned char disk);
 void IDE_EmuINT13DiskReadByBIOS(unsigned char disk,unsigned int cyl,unsigned int head,unsigned sect);
 void IDE_EmuINT13DiskReadByBIOS_LBA(unsigned char disk,uint64_t lba);
 
+void diskio_delay(Bits value/*bytes*/);
+
 static Bitu INT13_DiskHandler(void) {
     uint16_t segat, bufptr;
     uint8_t sectbuf[512];
@@ -846,6 +849,8 @@ static Bitu INT13_DiskHandler(void) {
         for(i=0;i<reg_al;i++) {
             last_status = imageDiskList[drivenum]->Read_Sector((uint32_t)reg_dh, (uint32_t)(reg_ch | ((reg_cl & 0xc0)<< 2)), (uint32_t)((reg_cl & 63)+i), sectbuf);
 
+            diskio_delay(512);
+
             /* IDE emulation: simulate change of IDE state that would occur on a real machine after INT 13h */
             IDE_EmuINT13DiskReadByBIOS(reg_dl, (uint32_t)(reg_ch | ((reg_cl & 0xc0)<< 2)), (uint32_t)reg_dh, (uint32_t)((reg_cl & 63)+i));
 
@@ -892,6 +897,8 @@ static Bitu INT13_DiskHandler(void) {
                 sectbuf[t] = real_readb(SegValue(es),bufptr);
                 bufptr++;
             }
+
+            diskio_delay(512);
 
             last_status = imageDiskList[drivenum]->Write_Sector((uint32_t)reg_dh, (uint32_t)(reg_ch | ((reg_cl & 0xc0) << 2)), (uint32_t)((reg_cl & 63) + i), &sectbuf[0]);
             if(last_status != 0x00) {
@@ -1100,6 +1107,8 @@ static Bitu INT13_DiskHandler(void) {
         for(i=0;i<dap.num;i++) {
             last_status = imageDiskList[drivenum]->Read_AbsoluteSector(dap.sector+i, sectbuf);
 
+            diskio_delay(512);
+
             IDE_EmuINT13DiskReadByBIOS_LBA(reg_dl,dap.sector+i);
 
             if((last_status != 0x00) || (killRead)) {
@@ -1132,6 +1141,8 @@ static Bitu INT13_DiskHandler(void) {
                 sectbuf[t] = real_readb(dap.seg,bufptr);
                 bufptr++;
             }
+
+            diskio_delay(512);
 
             last_status = imageDiskList[drivenum]->Write_AbsoluteSector(dap.sector+i, &sectbuf[0]);
             if(last_status != 0x00) {

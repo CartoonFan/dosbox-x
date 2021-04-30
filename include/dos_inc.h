@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -112,7 +112,7 @@ enum { RETURN_EXIT=0,RETURN_CTRLC=1,RETURN_ABORT=2,RETURN_TSR=3};
 extern Bitu DOS_FILES;
 
 #define DOS_DRIVES 26
-#define DOS_DEVICES 30
+#define DOS_DEVICES 45
 
 
 #if 0 /* ORIGINAL DEFINES FOR REFERENCE */

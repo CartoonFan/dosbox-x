@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 #ifdef __GNUC__
 # if defined(__MINGW32__) || (defined(MACOSX) && !defined(__arm64__))
 #  include "fpu_control_x86.h"
-# elif defined(MACOSX) && defined(__arm64__)
+# elif (defined(MACOSX) && defined(__arm64__)) || defined(EMSCRIPTEN)
 /* ? */
 #  define _FPU_SETCW(x) /* dummy */
 # else

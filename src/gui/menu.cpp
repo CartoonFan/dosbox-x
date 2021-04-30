@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -113,13 +113,11 @@ static const char *def_menu_main[] =
 {
     "mapper_gui",
     "mapper_mapper",
-    "load_mapper_file",
+    "mapper_loadmap",
     "--",
     "MainSendKey",
     "MainHostKey",
-#if defined(C_SDL2) || defined(WIN32) || defined(MACOSX) || defined(LINUX) && C_X11
     "SharedClipboard",
-#endif
     "--",
     "mapper_capmouse",
     "auto_lock_mouse",
@@ -189,22 +187,22 @@ static const char *def_menu_main_wheelarrow[] =
 /* main -> shared clipboard menu ("SharedClipboard") */
 static const char *def_menu_main_clipboard[] =
 {
-#if defined(WIN32) || defined(C_SDL2)
-    "clipboard_quick",
+#if defined(WIN32) || defined(MACOSX) || defined(C_SDL2)
+    "mapper_fastedit",
     "clipboard_right",
     "clipboard_middle",
-#endif
-#if defined(WIN32)
+    "clipboard_arrows",
     "--",
+#endif
     "clipboard_device",
     "clipboard_dosapi",
-#endif
-#if defined(WIN32) || defined(C_SDL2)
+    "clipboard_biospaste",
     "--",
+#if defined(WIN32) || defined(MACOSX) || defined(C_SDL2)
     "mapper_copyall",
 #endif
     "mapper_paste",
-    "clipboard_paste_stop",
+    "mapper_pasteend",
     NULL
 };
 
@@ -316,14 +314,13 @@ static const char *def_menu_video_scaler[] =
 static const char *def_menu_video_output[] =
 {
     "output_surface",
-#if !defined(C_SDL2) && !defined(HX_DOS)
-# if (HAVE_D3D9_H) && defined(WIN32)
+#if (HAVE_D3D9_H) && defined(WIN32) && !defined(HX_DOS)
     "output_direct3d",
-# endif
 #endif
 #if defined(C_OPENGL) && !defined(HX_DOS)
     "output_opengl",
     "output_openglnb",
+    "output_openglpp",
 #endif
 #if defined(USE_TTF)
     "output_ttf",
@@ -350,10 +347,16 @@ static const char *def_menu_video_textmode[] =
     "line_132x43",
     "line_132x50",
     "line_132x60",
+    NULL
+};
+
 #if defined(USE_TTF)
+/* video TTF menu ("VideoTTFMenu") */
+static const char *def_menu_video_ttf[] =
+{
+    "mapper_incsize",
+    "mapper_decsize",
     "--",
-    "mapper_ttf_incsize",
-    "mapper_ttf_decsize",
     "ttf_showbold",
     "ttf_showital",
     "ttf_showline",
@@ -363,9 +366,9 @@ static const char *def_menu_video_textmode[] =
     "ttf_wpwp",
     "ttf_wpws",
     "ttf_wpxy",
-#endif
     NULL
 };
+#endif
 
 /* video vsync menu ("VideoVsyncMenu") */
 static const char *def_menu_video_vsync[] =
@@ -455,6 +458,9 @@ static const char *def_menu_video[] =
     "VideoOverscanMenu",
     "VideoFrameskipMenu",
     "VideoTextmodeMenu",
+#if defined(USE_TTF)
+    "VideoTTFMenu",
+#endif
     "VideoPC98Menu",
 #if defined(C_D3DSHADERS) || defined(C_OPENGL)
     "--",
@@ -474,26 +480,27 @@ static const char *def_menu_video[] =
 /* DOS menu ("DOSMenu") */
 static const char *def_menu_dos[] =
 {
-    "DOSMouseMenu",
-    "--",
-    "DOSVerMenu",
-    "DOSLFNMenu",
-    "DOSEMSMenu",
-    "--",
-#if defined(WIN32) && !defined(HX_DOS)
-    "DOSWinMenu",
-#endif
-    "shell_config_commands",
 #if !defined(HX_DOS)
     "mapper_quickrun",
 #endif
+    "DOSVerMenu",
+    "DOSLFNMenu",
+    "--",
+    "DOSMouseMenu",
+    "DOSEMSMenu",
+#if defined(WIN32) && !defined(HX_DOS)
+    "DOSWinMenu",
+#endif
     "--",
     "quick_reboot",
+    "sync_host_datetime",
+    "shell_config_commands",
     "--",
     "mapper_swapimg",
     "mapper_swapcd",
-    "--",
     "mapper_rescanall",
+    "--",
+    "make_diskimage",
     "list_drivenum",
     "list_ideinfo",
 #if C_PRINTER || C_DEBUG
@@ -599,8 +606,9 @@ static const char *def_menu_capture[] =
     "mapper_savestate",
     "mapper_loadstate",
     "saveslotmenu",
+    "autosavecfg",
     "browsesavefile",
-    "showstate",
+    "mapper_showstate",
     NULL
 };
 
@@ -619,6 +627,7 @@ static const char *def_menu_capture_format[] =
 /* Save/load options */
 static const char *save_load_options[] =
 {
+    "enable_autosave",
     "noremark_savestate",
     "force_loadstate",
     "usesavefile",
@@ -646,6 +655,7 @@ static const char *def_save_slots[] =
     "slot8",
     "slot9",
     "--",
+    "lastautosaveslot",
     "mapper_prevslot",
     "mapper_nextslot",
     "--",
@@ -695,7 +705,7 @@ static const char *def_menu_drive[] =
 /* help DOS commands ("HelpCommandMenu") */
 #define MENU_HELP_COMMAND_MAX 512
 static const char *def_menu_help_command[MENU_HELP_COMMAND_MAX];
-char help_command_temp[512][30];
+char help_command_temp[MENU_HELP_COMMAND_MAX][30];
 
 /* help output debug ("HelpDebugMenu") */
 static const char *def_menu_help_debug[] =
@@ -705,14 +715,15 @@ static const char *def_menu_help_debug[] =
 #endif
 #if !defined(MACOSX) && !defined(LINUX) && !defined(HX_DOS) && !defined(C_EMSCRIPTEN)
     "show_console",
-    "wait_on_error",
 #endif
 #if C_DEBUG
+    "save_logas",
     "--",
     "debug_blankrefreshtest",
     "debug_pageflip",
     "debug_retracepoll",
     "--",
+    "wait_on_error",
     "debug_logint21",
     "debug_logfileio",
 #endif
@@ -731,15 +742,23 @@ static const char *def_menu_help[] =
     "help_issue",
 #endif
     "--",
+#if C_PCAP
     "help_nic",
+#endif
+#if C_PRINTER && defined(WIN32)
+    "help_prt",
+#endif
 #if C_DEBUG || !defined(MACOSX) && !defined(LINUX) && !defined(HX_DOS) && !defined(C_EMSCRIPTEN)
     "HelpDebugMenu",
 #endif
+#if C_PCAP || C_PRINTER && defined(WIN32) || C_DEBUG || !defined(MACOSX) && !defined(LINUX) && !defined(HX_DOS) && !defined(C_EMSCRIPTEN)
     "--",
+#endif
     "help_about",
     NULL
 };
 
+extern bool is_paused;
 void DOSBox_SetSysMenu(void);
 bool DOSBox_isMenuVisible(void) {
     return menu.toggle;
@@ -923,6 +942,10 @@ void DOSBoxMenu::dump_log_debug(void) {
     }
     LOG_MSG("---- display list ----");
     dump_log_displaylist(display_list, 1);
+}
+
+std::vector<DOSBoxMenu::item> DOSBoxMenu::get_master_list(void) {
+    return master_list;
 }
 
 void DOSBoxMenu::clear_all_menu_items(void) {
@@ -1124,6 +1147,31 @@ void* DOSBoxMenu::getNsMenu(void) const {
 }
 #endif
 
+#if defined(WIN32) && !defined(HX_DOS)
+LPWSTR getWString(std::string str, wchar_t *def, wchar_t*& buffer) {
+    LPWSTR ret = def;
+    int reqsize = 0, cp = dos.loaded_codepage?dos.loaded_codepage:(IS_PC98_ARCH?932:0);
+    Section_prop *section = section = static_cast<Section_prop *>(control->GetSection("config"));
+    if (!dos.loaded_codepage && !IS_PC98_ARCH && section!=NULL) {
+        char *countrystr = (char *)section->Get_string("country"), *r=strchr(countrystr, ',');
+        if (r!=NULL && *(r+1)) cp = atoi(trim(r+1));
+    }
+    uint16_t len=(uint16_t)str.size();
+    if (cp) {
+        if (cp==808) cp=866;
+        else if (cp==872) cp=855;
+        reqsize = MultiByteToWideChar(cp, 0, str.c_str(), len+1, NULL, 0);
+        buffer = new wchar_t[reqsize];
+        if (reqsize>0 && MultiByteToWideChar(cp, 0, str.c_str(), len+1, buffer, reqsize)==reqsize) ret = (LPWSTR)buffer;
+    } else {
+        buffer = new wchar_t[len+1];
+        mbstowcs(buffer, str.c_str(), len+1);
+        ret = (LPWSTR)buffer;
+    }
+    return ret;
+}
+#endif
+
 #if DOSBOXMENU_TYPE == DOSBOXMENU_HMENU /* Windows menu handle */
 std::string DOSBoxMenu::item::winConstructMenuText(void) {
     std::string r;
@@ -1161,6 +1209,7 @@ std::string DOSBoxMenu::item::winConstructMenuText(void) {
 }
 
 void DOSBoxMenu::item::winAppendMenu(HMENU handle) {
+    wchar_t* buffer = NULL;
     if (type == separator_type_id) {
         AppendMenu(handle, MF_SEPARATOR, 0, NULL);
     }
@@ -1168,8 +1217,13 @@ void DOSBoxMenu::item::winAppendMenu(HMENU handle) {
         AppendMenu(handle, MF_MENUBREAK, 0, NULL);
     }
     else if (type == submenu_type_id) {
-        if (winMenu != NULL)
-            AppendMenu(handle, MF_POPUP | MF_STRING, (uintptr_t)winMenu, winConstructMenuText().c_str());
+        if (winMenu != NULL) {
+            /*LPWSTR str = getWString(winConstructMenuText(), L"", buffer);
+            if (wcscmp(str, L""))
+                AppendMenuW(handle, MF_POPUP | MF_STRING, (uintptr_t)winMenu, str);
+            else*/
+                AppendMenu(handle, MF_POPUP | MF_STRING, (uintptr_t)winMenu, winConstructMenuText().c_str());
+        }
     }
     else if (type == item_type_id) {
         unsigned int attr = MF_STRING;
@@ -1177,8 +1231,13 @@ void DOSBoxMenu::item::winAppendMenu(HMENU handle) {
         attr |= (status.checked) ? MF_CHECKED : MF_UNCHECKED;
         attr |= (status.enabled) ? MF_ENABLED : (MF_DISABLED | MF_GRAYED);
 
-        AppendMenu(handle, attr, (uintptr_t)(master_id + winMenuMinimumID), winConstructMenuText().c_str());
+        /*LPWSTR str = getWString(winConstructMenuText(), L"", buffer);
+        if (wcscmp(str, L""))
+            AppendMenuW(handle, attr, (uintptr_t)(master_id + winMenuMinimumID), str);
+        else*/
+            AppendMenu(handle, attr, (uintptr_t)(master_id + winMenuMinimumID), winConstructMenuText().c_str());
     }
+    if (buffer != NULL) {delete[] buffer;buffer = NULL;}
 }
 
 bool DOSBoxMenu::winMenuSubInit(DOSBoxMenu::item &p_item) {
@@ -1439,6 +1498,11 @@ void ConstructMenu(void) {
     /* video text-mode menu */
     ConstructSubMenu(mainMenu.get_item("VideoTextmodeMenu").get_master_id(), def_menu_video_textmode);
 
+#if defined(USE_TTF)
+    /* video TTF menu */
+    ConstructSubMenu(mainMenu.get_item("VideoTTFMenu").get_master_id(), def_menu_video_ttf);
+#endif
+
     /* video vsync menu */
     ConstructSubMenu(mainMenu.get_item("VideoVsyncMenu").get_master_id(), def_menu_video_vsync);
 
@@ -1631,7 +1695,7 @@ void DOSBox_SetMenu(DOSBoxMenu &altMenu) {
     if(!menu.gui) return;
     if(!menu.toggle) return;
 
-    LOG(LOG_MISC,LOG_DEBUG)("Win32: loading and attaching custom menu resource to DOSBox's window");
+    LOG(LOG_MISC,LOG_DEBUG)("Win32: loading and attaching custom menu resource to DOSBox-X's window");
 
     NonUserResizeCounter=1;
     SDL1_hax_SetMenu(altMenu.getWinMenu());
@@ -1654,7 +1718,7 @@ void DOSBox_SetMenu(void) {
 #if DOSBOXMENU_TYPE == DOSBOXMENU_HMENU
     if(!menu.gui) return;
 
-    LOG(LOG_MISC,LOG_DEBUG)("Win32: loading and attaching menu resource to DOSBox's window");
+    LOG(LOG_MISC,LOG_DEBUG)("Win32: loading and attaching menu resource to DOSBox-X's window");
 
     menu.toggle=true;
     NonUserResizeCounter=1;
@@ -1713,6 +1777,12 @@ void ToggleMenu(bool pressed) {
         menu.toggle=false;
         DOSBox_NoMenu();
     }
+#if defined(USE_TTF) && DOSBOXMENU_TYPE == DOSBOXMENU_SDLDRAW
+    if (ttf.inUse) {
+       void resetFontSize();
+       resetFontSize();
+    }
+#endif
 
     DOSBox_SetSysMenu();
 }
@@ -1728,30 +1798,6 @@ void DOSBox_RefreshMenu(void) {
 void DOSBox_CheckOS(int &id, int &major, int &minor) {
     id=major=minor=0;
 }
-#endif
-
-#if defined(WIN32)
-# if defined(HX_DOS) || !defined(C_SDL2)
-HWND GetHWND(void) {
-    SDL_SysWMinfo wmi;
-    SDL_VERSION(&wmi.version);
-
-    if(!SDL_GetWMInfo(&wmi)) {
-        return NULL;
-    }
-    return wmi.window;
-}
-
-HWND GetSurfaceHWND(void) {
-    SDL_SysWMinfo wmi;
-    SDL_VERSION(&wmi.version);
-
-    if (!SDL_GetWMInfo(&wmi)) {
-        return NULL;
-    }
-    return wmi.child_window;
-}
-# endif
 #endif
 
 void MSG_WM_COMMAND_handle(SDL_SysWMmsg &Message) {
@@ -1811,7 +1857,7 @@ void MSG_WM_COMMAND_handle(SDL_SysWMmsg &Message) {
 
 void DOSBox_SetSysMenu(void) {
 #if defined(WIN32) && !defined(HX_DOS)
-    MENUITEMINFO mii;
+    MENUITEMINFOW mii;
     HMENU sysmenu;
 
     sysmenu = GetSystemMenu(GetHWND(), TRUE); // revert, so we can reapply menu items
@@ -1820,142 +1866,119 @@ void DOSBox_SetSysMenu(void) {
 
     AppendMenu(sysmenu, MF_SEPARATOR, -1, "");
 
-    std::string get_mapper_shortcut(const char *name), key="";
-    char msg[512];
+    std::string get_mapper_shortcut(const char *name), key="", msg="";
+    wchar_t* buffer = NULL;
 
-#if DOSBOXMENU_TYPE == DOSBOXMENU_HMENU
     {
-        strcpy(msg, "Show &menu bar");
-        key=get_mapper_shortcut("togmenu");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="togmenu";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
         mii.fState = (menu.toggle ? MFS_CHECKED : 0) | (GFX_GetPreventFullscreen() ? MFS_DISABLED : MFS_ENABLED);
         mii.wID = ID_WIN_SYSMENU_TOGGLEMENU;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg)+1);
+        mii.dwTypeData = getWString(msg, L"Show menu bar", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
-#endif
 
     {
-        strcpy(msg, "&Pause emulation");
-        key=get_mapper_shortcut("pause");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="pause";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
-        mii.fState = MFS_ENABLED;
+        mii.fState = (is_paused ? MFS_CHECKED : 0) | MFS_ENABLED;
         mii.wID = ID_WIN_SYSMENU_PAUSE;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg) + 1);
+        mii.dwTypeData = getWString(msg, L"Pause emulation", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
 
     AppendMenu(sysmenu, MF_SEPARATOR, -1, "");
 
     {
-        strcpy(msg, "Reset window size");
-        key=get_mapper_shortcut("resetsize");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="resetsize";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
         mii.fState = MFS_ENABLED;
         mii.wID = ID_WIN_SYSMENU_RESETSIZE;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg)+1);
+        mii.dwTypeData = getWString(msg, L"Reset window size", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
 
 #if defined(USE_TTF)
     bool TTF_using(void);
     {
-        strcpy(msg, "Increase TTF font size");
-        key=get_mapper_shortcut("ttf_incsize");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="incsize";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
         mii.fState = TTF_using() ? MFS_ENABLED : MFS_DISABLED;
         mii.wID = ID_WIN_SYSMENU_TTFINCSIZE;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg)+1);
+        mii.dwTypeData = getWString(msg, L"Increase TTF font size", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
 
     {
-        strcpy(msg, "Decrease TTF font size");
-        key=get_mapper_shortcut("ttf_decsize");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="decsize";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
         mii.fState = TTF_using() ? MFS_ENABLED : MFS_DISABLED;
         mii.wID = ID_WIN_SYSMENU_TTFDECSIZE;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg)+1);
+        mii.dwTypeData = getWString(msg, L"Decrease TTF font size", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
 #endif
 
     AppendMenu(sysmenu, MF_SEPARATOR, -1, "");
 
     {
-        strcpy(msg, "Configuration &tool");
-        key=get_mapper_shortcut("gui");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="gui";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
         mii.fState = MFS_ENABLED;
         mii.wID = ID_WIN_SYSMENU_CFG_GUI;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg) + 1);
+        mii.dwTypeData = getWString(msg, L"Configuration tool", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
 
     {
-        strcpy(msg, "Mapper &editor");
-        key=get_mapper_shortcut("mapper");
-        if (key.size()) {
-            strcat(msg, "\t");
-            strcat(msg, key.c_str());
-        }
+        key="mapper";
+        msg=mainMenu.get_item("mapper_"+key).get_text()+(get_mapper_shortcut(key.c_str()).size()?"\t"+get_mapper_shortcut(key.c_str()):"");
         memset(&mii, 0, sizeof(mii));
         mii.cbSize = sizeof(mii);
         mii.fMask = MIIM_ID | MIIM_STRING | MIIM_STATE;
         mii.fState = MFS_ENABLED;
         mii.wID = ID_WIN_SYSMENU_MAPPER;
-        mii.dwTypeData = (LPTSTR)(msg);
-        mii.cch = (UINT)(strlen(msg) + 1);
+        mii.dwTypeData = getWString(msg, L"Mapper editor", buffer);
+        mii.cch = (UINT)(wcslen(mii.dwTypeData)+1);
 
-        InsertMenuItem(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        InsertMenuItemW(sysmenu, GetMenuItemCount(sysmenu), TRUE, &mii);
+        if (buffer != NULL) {delete[] buffer;buffer = NULL;}
     }
 #endif
 }

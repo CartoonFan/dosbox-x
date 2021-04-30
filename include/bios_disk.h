@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -87,10 +87,10 @@ public:
     uint32_t sectors = 0;
     bool hardDrive = false;
     uint64_t diskSizeK = 0;
+    FILE* diskimg = NULL;
 
 protected:
 	imageDisk(IMAGE_TYPE class_id);
-    FILE* diskimg = NULL;
     uint8_t floppytype = 0;
 
     uint32_t reserved_cylinders = 0;

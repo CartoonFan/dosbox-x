@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ TCPClientSocket::TCPClientSocket(int platformsocket) {
 	((struct _TCPsocketX*)nativetcpstruct)->sflag=0;
 	((struct _TCPsocketX*)nativetcpstruct)->channel=(SOCKET) platformsocket;
 	sockaddr_in		sa;
-#ifdef OS2
+#if defined(WIN32) || defined(OS2)
 	int			sz;
 #else
 	socklen_t		sz;

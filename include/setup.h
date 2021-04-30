@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -98,7 +98,7 @@ public:
 	Value& operator= (char const * const in) { return copy(Value(in));}
 	Value& operator= (Value const& in)       { return copy(Value(in));}
 
-	bool operator== (Value const & other);
+	bool operator== (Value const & other) const;
 	operator bool () const;
 	operator Hex () const;
 	operator int () const;
@@ -150,7 +150,7 @@ public:
             if (propname=="monochrome_pal" && value.ToString()=="green") return false;
             if (propname=="cycles" && value.ToString()=="auto") return false;
             if ((propname=="serial1" || propname=="serial2") && value.ToString()=="dummy") return false;
-            if ((propname=="serial3" || propname=="serial4") && value.ToString()=="disabled") return false;
+            if (propname.substr(0,6)=="serial" && propname[6]>='3' && propname[6]<='9' && value.ToString()=="disabled") return false;
         }
         return default_value.ToString()!=value.ToString();
     };
@@ -169,7 +169,7 @@ protected:
 	bool is_basic=false;
 	bool is_modified;
 	std::vector<Value> suggested_values;
-	typedef std::vector<Value>::iterator iter;
+	typedef std::vector<Value>::const_iterator const_iter;
 	Value default_value;
 	const Changeable::Value change;
 	bool use_global_config_str;

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -58,6 +58,15 @@
 #include "../libs/tinyfiledialogs/tinyfiledialogs.c"
 #endif
 #if defined(WIN32)
+# if defined(__MINGW32__)
+#  define ht_stat_t struct _stat
+#  define ht_stat(x,y) _wstat(x,y)
+# else
+#  define ht_stat_t struct _stat64
+#  define ht_stat(x,y) _wstat64(x,y)
+# endif
+typedef wchar_t host_cnv_char_t;
+host_cnv_char_t *CodePageGuestToHost(const char *s);
 #if !defined(S_ISREG)
 # define S_ISREG(x) ((x & S_IFREG) == S_IFREG)
 #endif
@@ -70,12 +79,15 @@ int freesizecap = 1;
 bool Mouse_Drv=true;
 bool Mouse_Vertical = false;
 bool force_nocachedir = false;
+bool lockmount = true;
 bool wpcolon = true;
 bool startcmd = false;
 bool startwait = true;
 bool startquiet = false;
 bool mountwarning = true;
 bool qmount = false;
+bool nowarn = false;
+extern bool mountfro[26], mountiro[26];
 
 void DOS_EnableDriveMenu(char drv);
 void runBoot(const char *str), runMount(const char *str), runImgmount(const char *str), runRescan(const char *str);
@@ -306,7 +318,10 @@ void MountHelper(char drive, const char drive2[DOS_PATHLENGTH], std::string driv
 				return;
 			}
 		}
-	} else newdrive=new localDrive(temp_line.c_str(),sizes[0],bit8size,sizes[2],sizes[3],mediaid,options);
+	} else {
+        newdrive=new localDrive(temp_line.c_str(),sizes[0],bit8size,sizes[2],sizes[3],mediaid,options);
+        newdrive->readonly = mountfro[drive-'A'];
+    }
 
 	if (!newdrive) E_Exit("DOS:Can't create drive");
 	Drives[drive-'A']=newdrive;
@@ -418,7 +433,10 @@ void MenuMountDrive(char drive, const char drive2[DOS_PATHLENGTH]) {
 				return;
 			}
 		}
-	} else newdrive=new localDrive(temp_line.c_str(),sizes[0],bit8size,sizes[2],sizes[3],mediaid,options);
+	} else {
+        newdrive=new localDrive(temp_line.c_str(),sizes[0],bit8size,sizes[2],sizes[3],mediaid,options);
+        newdrive->readonly = mountfro[drive-'A'];
+    }
 
 	if (!newdrive) E_Exit("DOS:Can't create drive");
 	if(error && (type==DRIVE_CDROM)) return;
@@ -442,7 +460,25 @@ void MenuMountDrive(char drive, const char drive2[DOS_PATHLENGTH]) {
 }
 #endif
 
-void MenuBrowseImageFile(char drive, bool boot, bool multiple) {
+std::string newstr="";
+std::string GetNewStr(const char *str) {
+    newstr = str?std::string(str):"";
+#if defined(WIN32)
+    if (str&&dos.loaded_codepage!=437) {
+        char *temp = NULL;
+        wchar_t* wstr = NULL;
+        int reqsize = MultiByteToWideChar(CP_UTF8, 0, str, strlen(str)+1, NULL, 0);
+        if (reqsize>0 && (wstr = new wchar_t[reqsize]) && MultiByteToWideChar(CP_UTF8, 0, str, strlen(str)+1, wstr, reqsize)==reqsize) {
+            reqsize = WideCharToMultiByte(dos.loaded_codepage==808?866:(dos.loaded_codepage==872?855:dos.loaded_codepage), WC_NO_BEST_FIT_CHARS, wstr, -1, NULL, 0, "\x07", NULL);
+            if (reqsize > 1 && (temp = new char[reqsize]) && WideCharToMultiByte(dos.loaded_codepage==808?866:(dos.loaded_codepage==872?855:dos.loaded_codepage), WC_NO_BEST_FIT_CHARS, wstr, -1, (LPSTR)temp, reqsize, "\x07", NULL) == reqsize)
+                newstr = std::string(temp);
+        }
+    }
+#endif
+    return newstr;
+}
+
+void MenuBrowseImageFile(char drive, bool arc, bool boot, bool multiple) {
 	std::string str(1, drive);
 	std::string drive_warn;
 	if (Drives[drive-'A']&&!boot) {
@@ -464,35 +500,45 @@ void MenuBrowseImageFile(char drive, bool boot, bool multiple) {
     char CurrentDir[512];
     char * Temp_CurrentDir = CurrentDir;
     getcwd(Temp_CurrentDir, 512);
-    const char *lFilterPatterns[] = {"*.ima","*.img","*.vhd","*.hdi","*.iso","*.cue","*.bin","*.chd","*.mdf","*.zip","*.7z","*.IMA","*.IMG","*.VHD","*.HDI","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.ZIP","*.7Z"};
-    const char *lFilterDescription = "Image/Zip files (*.ima, *.img, *.vhd, *.hdi, *.iso, *.cue, *.bin, *.chd, *.mdf, *.zip, *.7z)";
-    char const * lTheOpenFileName = tinyfd_openFileDialog(((multiple?"Select image file(s) for Drive ":"Select an image file for Drive ")+str+":").c_str(),"",20,lFilterPatterns,lFilterDescription,multiple?1:0);
-    std::string files="";
-    if (multiple&&lTheOpenFileName) {
-        files += "\"";
-        for (int i=0; i<strlen(lTheOpenFileName); i++)
-            files += lTheOpenFileName[i]=='|'?"\" \"":std::string(1,lTheOpenFileName[i]);
-        files += "\" ";
-    }
-    while (multiple&&lTheOpenFileName&&tinyfd_messageBox("Mount image files","Do you want to mount more image file(s)?","yesno", "question", 1)) {
-        lTheOpenFileName = tinyfd_openFileDialog(("Select image file(s) for Drive "+str+":").c_str(),"",20,lFilterPatterns,lFilterDescription,multiple?1:0);
-        if (lTheOpenFileName) {
+    char const * lTheOpenFileName;
+    std::string files="", fname="";
+    if (arc) {
+        const char *lFilterPatterns[] = {"*.zip","*.7z","*.ZIP","*.7Z"};
+        const char *lFilterDescription = "Archive files (*.zip, *.7z)";
+        lTheOpenFileName = tinyfd_openFileDialog(("Select an archive file for Drive "+str+":").c_str(),"",4,lFilterPatterns,lFilterDescription,0);
+        if (lTheOpenFileName) fname = GetNewStr(lTheOpenFileName);
+    } else {
+        const char *lFilterPatterns[] = {"*.ima","*.img","*.vhd","*.hdi","*.iso","*.cue","*.bin","*.chd","*.mdf","*.gog","*.ins","*.IMA","*.IMG","*.VHD","*.HDI","*.ISO","*.CUE","*.BIN","*.CHD","*.MDF","*.GOG","*.INS"};
+        const char *lFilterDescription = "Disk/CD image files (*.ima, *.img, *.vhd, *.hdi, *.iso, *.cue, *.bin, *.chd, *.mdf, *.gog, *.ins)";
+        lTheOpenFileName = tinyfd_openFileDialog(((multiple?"Select image file(s) for Drive ":"Select an image file for Drive ")+str+":").c_str(),"",22,lFilterPatterns,lFilterDescription,multiple?1:0);
+        if (lTheOpenFileName) fname = GetNewStr(lTheOpenFileName);
+        if (multiple&&fname.size()) {
             files += "\"";
-            for (int i=0; i<strlen(lTheOpenFileName); i++)
-                files += lTheOpenFileName[i]=='|'?"\" \"":std::string(1,lTheOpenFileName[i]);
+            for (int i=0; i<fname.size(); i++)
+                files += fname[i]=='|'?"\" \"":std::string(1,fname[i]);
             files += "\" ";
+        }
+        while (multiple&&lTheOpenFileName&&tinyfd_messageBox("Mount image files","Do you want to mount more image file(s)?","yesno", "question", 1)) {
+            lTheOpenFileName = tinyfd_openFileDialog(("Select image file(s) for Drive "+str+":").c_str(),"",20,lFilterPatterns,lFilterDescription,multiple?1:0);
+            if (lTheOpenFileName) {
+                fname = GetNewStr(lTheOpenFileName);
+                files += "\"";
+                for (int i=0; i<fname.size(); i++)
+                    files += fname[i]=='|'?"\" \"":std::string(1,fname[i]);
+                files += "\" ";
+            }
         }
     }
 
-	if (lTheOpenFileName||files.size()) {
+    if (fname.size()||files.size()) {
         char type[15];
-        if (!files.size()) {
+        if (!arc&&!files.size()) {
             char ext[5] = "";
-            if (strlen(lTheOpenFileName)>4)
-                strcpy(ext, lTheOpenFileName+strlen(lTheOpenFileName)-4);
+            if (fname.size()>4)
+                strcpy(ext, fname.substr(fname.size()-4).c_str());
             if(!strcasecmp(ext,".ima"))
                 strcpy(type,"-t floppy ");
-            else if((!strcasecmp(ext,".iso")) || (!strcasecmp(ext,".cue")) || (!strcasecmp(ext,".bin")) || (!strcasecmp(ext,".chd")) || (!strcasecmp(ext,".mdf")))
+            else if((!strcasecmp(ext,".iso")) || (!strcasecmp(ext,".cue")) || (!strcasecmp(ext,".bin")) || (!strcasecmp(ext,".chd")) || (!strcasecmp(ext,".mdf")) || (!strcasecmp(ext,".gog")) || (!strcasecmp(ext,".ins")))
                 strcpy(type,"-t iso ");
             else
                 strcpy(type,"");
@@ -505,12 +551,18 @@ void MenuBrowseImageFile(char drive, bool boot, bool multiple) {
 		temp_str[1]=' ';
 		strcat(mountstring,temp_str);
 		if (!multiple) strcat(mountstring,"\"");
-		strcat(mountstring,files.size()?files.c_str():lTheOpenFileName);
+		strcat(mountstring,files.size()?files.c_str():fname.c_str());
 		if (!multiple) strcat(mountstring,"\"");
-		if (boot) strcat(mountstring," -U");
-		qmount=true;
-		runImgmount(mountstring);
-		qmount=false;
+		if (mountiro[drive-'A']) strcat(mountstring," -ro");
+		if (boot) strcat(mountstring," -u");
+        if (arc) {
+            strcat(mountstring," -q");
+            runMount(mountstring);
+        } else {
+            qmount=true;
+            runImgmount(mountstring);
+            qmount=false;
+        }
 		chdir( Temp_CurrentDir );
 		if (!Drives[drive-'A']) {
 			drive_warn="Drive "+str+": failed to mount.";
@@ -523,9 +575,9 @@ void MenuBrowseImageFile(char drive, bool boot, bool multiple) {
 			std::string drive_warn="Drive "+std::string(1, drive)+": failed to boot.";
 			tinyfd_messageBox("Error",drive_warn.c_str(),"ok","error", 1);
 		} else if (multiple) {
-			tinyfd_messageBox("Information",("Mounted disk images to Drive "+std::string(1,drive)+":\n"+files).c_str(),"ok","info", 1);
-		} else {
-			tinyfd_messageBox("Information",("Mounted disk image to Drive "+std::string(1,drive)+":\n"+std::string(lTheOpenFileName)).c_str(),"ok","info", 1);
+			tinyfd_messageBox("Information",("Mounted disk images to Drive "+std::string(1,drive)+(dos.loaded_codepage==437?":\n"+files:".")+(mountiro[drive-'A']?"\n(Read-only mode)":"")).c_str(),"ok","info", 1);
+		} else if (lTheOpenFileName) {
+			tinyfd_messageBox("Information",(std::string(arc?"Mounted archive":"Mounted disk image")+" to Drive "+std::string(1,drive)+":\n"+std::string(lTheOpenFileName)+(arc||mountiro[drive-'A']?"\n(Read-only mode)":"")).c_str(),"ok","info", 1);
 		}
 	}
 	chdir( Temp_CurrentDir );
@@ -556,7 +608,10 @@ void MenuBrowseFolder(char drive, std::string drive_type) {
     else if(drive_type=="LOCAL")
         title += " as Local";
     char const * lTheSelectFolderName = tinyfd_selectFolderDialog(title.c_str(), NULL);
-    if (lTheSelectFolderName) MountHelper(drive,lTheSelectFolderName,drive_type);
+    if (lTheSelectFolderName) {
+        MountHelper(drive,GetNewStr(lTheSelectFolderName).c_str(),drive_type);
+        if (Drives[drive-'A']) tinyfd_messageBox("Information",("Drive "+std::string(1,drive)+" is now mounted to:\n"+std::string(lTheSelectFolderName)).c_str(),"ok","info", 1);
+    }
 #endif
 }
 
@@ -887,13 +942,11 @@ public:
         }
         /* Show list of cdroms */
         if (cmd->FindExist("-cd",false)) {
-#if !defined(C_SDL2)
             int num = SDL_CDNumDrives();
             if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_CDROMS_FOUND"),num);
             for (int i=0; i<num; i++) {
                 if (!quiet) WriteOut("%2d. %s\n",i,SDL_CDName(i));
             }
-#endif
             return;
         }
 
@@ -915,6 +968,7 @@ public:
         cmd->FindString("-t",type,true);
 		std::transform(type.begin(), type.end(), type.begin(), ::tolower);
         bool iscdrom = (type =="cdrom"); //Used for mscdex bug cdrom label name emulation
+        bool exist = false, removed = false;
         if (type=="floppy" || type=="dir" || type=="cdrom" || type =="overlay") {
             uint16_t sizes[4] = { 0 };
             uint8_t mediaid;
@@ -980,15 +1034,27 @@ public:
             int i_drive = toupper(temp_line[0]);
             if (!isalpha(i_drive)) goto showusage;
             if ((i_drive - 'A') >= DOS_DRIVES || (i_drive - 'A') < 0) goto showusage;
-            drive = static_cast<char>(i_drive);
-
             if (!cmd->FindCommand(2,temp_line)) goto showusage;
             if (!temp_line.size()) goto showusage;
 			if (cmd->FindExist("-u",true)) {
+                bool curdrv = toupper(i_drive)-'A' == DOS_GetDefaultDrive();
                 const char *msg=UnmountHelper(i_drive);
 				if (!quiet) WriteOut(msg, toupper(i_drive));
 				if (!cmd->FindCommand(2,temp_line)||!temp_line.size()) return;
+                if (curdrv && toupper(i_drive)-'A' != DOS_GetDefaultDrive()) removed = true;
 			}
+            drive = static_cast<char>(i_drive);
+            if (type == "overlay") {
+                //Ensure that the base drive exists:
+                if (!Drives[drive-'A']) {
+                    if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_NO_BASE"));
+                    return;
+                }
+            } else if (Drives[drive-'A']) {
+                if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_ALREADY_MOUNTED"),drive,Drives[drive-'A']->GetInfo());
+                return;
+            }
+
             temp_line.erase(std::find_if(temp_line.rbegin(), temp_line.rend(), [](unsigned char ch) {return !std::isspace(ch);}).base(), temp_line.end());
             if(path_relative_to_last_config && control->configfiles.size() && !Cross::IsPathAbsolute(temp_line)) {
 		        std::string lastconfigdir(control->configfiles[control->configfiles.size()-1]);
@@ -1018,9 +1084,21 @@ public:
 #endif
 
 #if defined (WIN32) || defined(OS2)
+            // Windows: Workaround for LaunchBox
             if (is_physfs && temp_line.size()>4 && temp_line[0]=='\'' && toupper(temp_line[1])>='A' && toupper(temp_line[1])<='Z' && temp_line[2]==':' && (temp_line[3]=='/' || temp_line[3]=='\\') && temp_line.back()=='\'') {
                 temp_line = temp_line.substr(1, temp_line.size()-2);
                 is_physfs = temp_line.find(':',((temp_line[0]|0x20) >= 'a' && (temp_line[0]|0x20) <= 'z')?2:0) != std::string::npos;
+            } else if (is_physfs && temp_line.size()>3 && temp_line[0]=='\'' && toupper(temp_line[1])>='A' && toupper(temp_line[1])<='Z' && temp_line[2]==':' && (temp_line[3]=='/' || temp_line[3]=='\\')) {
+                std::string line=trim((char *)cmd->GetRawCmdline().c_str());
+                std::size_t space=line.find(' ');
+                if (space!=std::string::npos) {
+                    line=trim((char *)line.substr(space).c_str());
+                    std::size_t found=line.back()=='\''?line.find_last_of('\''):line.rfind("' ");
+                    if (found!=std::string::npos&&found>2) {
+                        temp_line=line.substr(1, found-1);
+                        is_physfs = temp_line.find(':',((temp_line[0]|0x20) >= 'a' && (temp_line[0]|0x20) <= 'z')?2:0) != std::string::npos;
+                    }
+                }
             }
 #else
             // Linux: Convert backslash to forward slash
@@ -1032,6 +1110,12 @@ public:
             }
 #endif
 
+            bool useh = false;
+#if defined (WIN32)
+            ht_stat_t htest;
+#else
+            struct stat htest;
+#endif
 #if defined (WIN32) || defined(OS2)
             /* Removing trailing backslash if not root dir so stat will succeed */
             if(temp_line.size() > 3 && temp_line[temp_line.size()-1]=='\\') temp_line.erase(temp_line.size()-1,1);
@@ -1039,7 +1123,10 @@ public:
             if (!is_physfs && stat(temp_line.c_str(),&test)) {
 #endif
 #if defined(WIN32)
-// Nothing to do here.
+                const host_cnv_char_t* host_name = CodePageGuestToHost(temp_line.c_str());
+                if (host_name == NULL || ht_stat(host_name, &htest)) failed = true;
+                useh = true;
+            }
 #elif defined (OS2)
                 if (temp_line.size() <= 2) // Seems to be a drive.
                 {
@@ -1058,7 +1145,6 @@ public:
                     }
                 }
             }
-            if (failed) {
 #else
             if (!is_physfs && stat(temp_line.c_str(),&test)) {
                 failed = true;
@@ -1066,13 +1152,13 @@ public:
                 //Try again after resolving ~
                 if(!stat(temp_line.c_str(),&test)) failed = false;
             }
-            if(failed) {
 #endif
+            if(failed) {
                 if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_ERROR_1"),temp_line.c_str());
                 return;
             }
             /* Not a switch so a normal directory/file */
-            if (!is_physfs && !S_ISDIR(test.st_mode)) {
+            if (!is_physfs && !S_ISDIR(useh?htest.st_mode:test.st_mode)) {
 #ifdef OS2
                 HFILE cdrom_fd = 0;
                 ULONG ulAction = 0;
@@ -1080,8 +1166,12 @@ public:
                 APIRET rc = DosOpen((unsigned char*)temp_line.c_str(), &cdrom_fd, &ulAction, 0L, FILE_NORMAL, OPEN_ACTION_OPEN_IF_EXISTS,
                     OPEN_FLAGS_DASD | OPEN_SHARE_DENYNONE | OPEN_ACCESS_READONLY, 0L);
                 DosClose(cdrom_fd);
-                if (rc != NO_ERROR && rc != ERROR_NOT_READY) {
-                    if (!quiet) {
+                if (rc != NO_ERROR && rc != ERROR_NOT_READY)
+#endif
+                {
+                    is_physfs = true;
+                    temp_line.insert(0, 1, ':');
+                    /*if (!quiet) {
                         WriteOut(MSG_Get("PROGRAM_MOUNT_ERROR_2"),temp_line.c_str());
                         if (temp_line.length()>4) {
                             char ext[5];
@@ -1091,25 +1181,13 @@ public:
                                 WriteOut(MSG_Get("PROGRAM_MOUNT_IMGMOUNT"),temp_line.c_str());
                         }
                     }
-                    return;
+                    return;*/
                 }
-#else
-                if (!quiet) {
-                    WriteOut(MSG_Get("PROGRAM_MOUNT_ERROR_2"),temp_line.c_str());
-                    if (temp_line.length()>4) {
-                        char ext[5];
-                        strncpy(ext, temp_line.substr(temp_line.length()-4).c_str(), 4);
-                        ext[4]=0;
-                        if (!strcasecmp(ext, ".iso")||!strcasecmp(ext, ".cue")||!strcasecmp(ext, ".bin")||!strcasecmp(ext, ".chd")||!strcasecmp(ext, ".mdf")||!strcasecmp(ext, ".ima")||!strcasecmp(ext, ".img")||!strcasecmp(ext, ".vhd")||!strcasecmp(ext, ".hdi"))
-                            WriteOut(MSG_Get("PROGRAM_MOUNT_IMGMOUNT"),temp_line.c_str());
-                    }
-                }
-                return;
-#endif
             }
 
             if (temp_line[temp_line.size()-1]!=CROSS_FILESPLIT) temp_line+=CROSS_FILESPLIT;
             uint8_t bit8size=(uint8_t) sizes[1];
+            exist = drive - 'A' < DOS_DRIVES && drive - 'A' >= 0 && Drives[drive - 'A'];
             if (type=="cdrom") {
                 int num = -1;
                 cmd->FindInt("-usecd",num,true);
@@ -1142,17 +1220,10 @@ public:
                     MSCDEX_SetCDInterface(CDROM_USE_IOCTL_DIO, num);
 #endif
                 }
-                if (is_physfs) {
-					if (!quiet) WriteOut(MSG_Get("PROGRAM_IMGMOUNT_CANT_CREATE_PHYSFS"));
-                    LOG_MSG("ERROR:This build does not support physfs");
-					return;
-                } else {
-					if (Drives[drive-'A']) {
-						if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_ALREADY_MOUNTED"),drive,Drives[drive-'A']->GetInfo());
-						return;
-					}
+                if (is_physfs)
+					newdrive  = new physfscdromDrive(drive,temp_line.c_str(),sizes[0],bit8size,sizes[2],0,mediaid,error,options);
+                else
                     newdrive  = new cdromDrive(drive,temp_line.c_str(),sizes[0],bit8size,sizes[2],sizes[3],mediaid,error,options);
-                }
                 // Check Mscdex, if it worked out...
                 if (!quiet)
                 switch (error) {
@@ -1162,6 +1233,7 @@ public:
                     case 3  :   WriteOut(MSG_Get("MSCDEX_ERROR_PATH"));             break;
                     case 4  :   WriteOut(MSG_Get("MSCDEX_TOO_MANY_DRIVES"));        break;
                     case 5  :   WriteOut(MSG_Get("MSCDEX_LIMITED_SUPPORT"));        break;
+                    case 10 :   WriteOut(MSG_Get("PROGRAM_MOUNT_PHYSFS_ERROR"));    break;
                     default :   WriteOut(MSG_Get("MSCDEX_UNKNOWN_ERROR"));          break;
                 }
                 if (error && error!=5) {
@@ -1170,7 +1242,7 @@ public:
                 }
             } else {
                 /* Give a warning when mount c:\ or the / */
-                if (mountwarning && !quiet) {
+                if (mountwarning && !quiet && !nowarn) {
 #if defined (WIN32) || defined(OS2)
                     if( (temp_line == "c:\\") || (temp_line == "C:\\") ||
                         (temp_line == "c:/") || (temp_line == "C:/")    )
@@ -1180,18 +1252,26 @@ public:
 #endif
                 }
                 if (is_physfs) {
-					if (!quiet) WriteOut(MSG_Get("PROGRAM_IMGMOUNT_CANT_CREATE_PHYSFS"));
-                    LOG_MSG("ERROR:This build does not support physfs");
-					return;
+                    int error = 0;
+					newdrive=new physfsDrive(drive,temp_line.c_str(),sizes[0],bit8size,sizes[2],sizes[3],mediaid,error,options);
+                    if (error) {
+                        if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_PHYSFS_ERROR"));
+                        delete newdrive;
+                        return;
+                    }
                 } else if(type == "overlay") {
-                  //Ensure that the base drive exists:
-                  if (!Drives[drive-'A']) { 
-                      if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_NO_BASE"));
+                  physfsDrive* pdp = dynamic_cast<physfsDrive*>(Drives[drive-'A']);
+                  physfscdromDrive* pcdp = dynamic_cast<physfscdromDrive*>(Drives[drive-'A']);
+                  if (pdp && !pcdp) {
+                      if (pdp->setOverlaydir(temp_line.c_str()))
+                          WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_STATUS"),(temp_line+(temp_line.size()&&temp_line.back()!=CROSS_FILESPLIT?std::string(1, CROSS_FILESPLIT):"")+std::string(1, drive)+"_DRIVE").c_str(),drive);
+                      else
+                          WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_ERROR"));
                       return;
                   }
                   localDrive* ldp = dynamic_cast<localDrive*>(Drives[drive-'A']);
                   cdromDrive* cdp = dynamic_cast<cdromDrive*>(Drives[drive-'A']);
-                  if (!ldp || cdp) {
+                  if (!ldp || cdp || pcdp) {
 					  if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_INCOMPAT_BASE"));
                       return;
                   }
@@ -1202,9 +1282,9 @@ public:
                   if (newdrive) {
                       if (o_error) {
                           if (quiet) {delete newdrive;return;}
-                          if (o_error == 1) WriteOut("No mixing of relative and absolute paths. Overlay failed.\n");
-                          else if (o_error == 2) WriteOut("Overlay directory cannot be the same as underlying filesystem.\n");
-                          else WriteOut("An error occurred when trying to create an overlay drive.\n");
+                          if (o_error == 1) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_MIXED_BASE"));
+                          else if (o_error == 2) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_SAME_AS_BASE"));
+                          else WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_ERROR"));
                           delete newdrive;
                           return;
                       } else {
@@ -1214,10 +1294,16 @@ public:
 							odrive->ovlreadonly = readonly;
 						  }
 					  }
+
+						//Copy current directory if not marked as deleted.
+						if (newdrive->TestDir(ldp->curdir)) {
+							strcpy(newdrive->curdir,ldp->curdir);
+						}
+
                       delete Drives[drive-'A'];
                       Drives[drive-'A'] = 0;
                   } else { 
-                      if (!quiet) WriteOut("Overlay drive construction failed.\n");
+                      if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_OVERLAY_ERROR"));
                       return;
                   }
               } else {
@@ -1230,13 +1316,9 @@ public:
             if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_ILL_TYPE"),type.c_str());
             return;
         }
-        if (Drives[drive-'A']) {
-            if (!quiet) WriteOut(MSG_Get("PROGRAM_MOUNT_ALREADY_MOUNTED"),drive,Drives[drive-'A']->GetInfo());
-            if (newdrive) delete newdrive;
-            return;
-        }
         if (!newdrive) E_Exit("DOS:Can't create drive");
         Drives[drive-'A']=newdrive;
+        if (removed && !exist) DOS_SetDefaultDrive(drive-'A');
         DOS_EnableDriveMenu(drive);
         /* Set the correct media byte in the table */
         mem_writeb(Real2Phys(dos.tables.mediaid)+((unsigned int)drive-'A')*dos.tables.dpb_size,newdrive->GetMediaByte());
@@ -1398,6 +1480,55 @@ void pc98_43d_write(Bitu port,Bitu val,Bitu iolen) {
     }
 }
 
+#if defined(WIN32)
+#include <fcntl.h>
+#else
+#if defined(MACOSX)
+#define _DARWIN_C_SOURCE
+#endif
+#include <sys/file.h>
+#endif
+FILE *retfile = NULL;
+FILE * fopen_lock(const char * fname, const char * mode) {
+    if (lockmount && strlen(mode)>1&&mode[strlen(mode)-1]=='+') {
+#if defined(WIN32)
+        HANDLE hFile = CreateFile(fname, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) {
+            const host_cnv_char_t* host_name = CodePageGuestToHost(fname);
+            if (host_name != NULL) hFile = CreateFileW(host_name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        }
+        if (hFile == INVALID_HANDLE_VALUE) return NULL;
+        int nHandle = _open_osfhandle((intptr_t)hFile, _O_RDONLY);
+        if (nHandle == -1) {CloseHandle(hFile);return NULL;}
+        retfile = _fdopen(nHandle, mode);
+        if(!retfile) {CloseHandle(hFile);return NULL;}
+        LockFile(hFile, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF);
+#else
+        retfile = fopen64(fname, mode);
+        if (retfile == NULL) return NULL; /* did you know fopen returns NULL if it cannot open the file? */
+        int lock = flock(fileno(retfile), LOCK_EX | LOCK_NB); /* did you know fileno() assumes retfile != NULL and you will segfault if that is wrong? */
+        if (lock < 0) {
+            fclose(retfile); /* don't leak file handles on failure to flock() */
+            return NULL;
+        }
+#endif
+    } else {
+        retfile = fopen64(fname, mode);
+#if defined(WIN32)
+        if (retfile == NULL) {
+            const host_cnv_char_t* host_name = CodePageGuestToHost(fname);
+            if (host_name != NULL) {
+                const size_t size = strlen(mode)+1;
+                wchar_t* wmode = new wchar_t[size];
+                mbstowcs (wmode, mode, size);
+                retfile = _wfopen(host_name, wmode);
+            }
+        }
+#endif
+    }
+    return retfile;
+}
+
 /*! \brief          BOOT.COM utility to boot a floppy or hard disk device.
  *
  *  \description    Users will use this command to boot a guest operating system from
@@ -1484,7 +1615,7 @@ private:
         Cross::ResolveHomedir(filename_s);
 		bool readonly=wpcolon&&filename_s.length()>1&&filename_s[0]==':';
 		if (!readonly)
-			tmpfile = fopen(filename_s.c_str(),"rb+");
+			tmpfile = fopen_lock(filename_s.c_str(),"rb+");
         if(readonly || !tmpfile) {
             if( (tmpfile = fopen(readonly?filename_s.c_str()+1:filename_s.c_str(),"rb")) ) {
                 //File exists; So can't be opened in correct mode => error 2
@@ -1685,8 +1816,14 @@ public:
             stack_seg = max_seg - 0x20;
 
         if(!cmd->GetCount()) {
-            printError();
-            return;
+            uint8_t drv = dos_kernel_disabled?26:DOS_GetDefaultDrive();
+            if (drv < 4 && Drives[drv] && !strncmp(Drives[drv]->GetInfo(), "fatDrive ", 9)) {
+                drive = 'A' + drv;
+                bootbyDrive = true;
+            } else {
+                printError();
+                return;
+            }
         } else if (cmd->GetCount()==1) {
 			cmd->FindCommand(1, temp_line);
 			if (temp_line.length()==2&&toupper(temp_line[0])>='A'&&toupper(temp_line[0])<='Z'&&temp_line[1]==':') {
@@ -2741,6 +2878,10 @@ restart_int:
         unsigned int c, h, s, sectors; 
         uint64_t size = 0;
 
+        if(control->SecureMode()) {
+            WriteOut(MSG_Get("PROGRAM_CONFIG_SECURE_DISALLOW"));
+            return;
+        }
         if(cmd->FindExist("-?")) {
             printHelp();
             return;
@@ -2810,7 +2951,7 @@ restart_int:
 
             bool setdir=false;
             char dirCur[512], dirNew[512];
-            if (getcwd(dirCur, 512)!=NULL&&(!strncmp(Drives[DOS_GetDefaultDrive()]->GetInfo(),"local ",6)||!strncmp(Drives[DOS_GetDefaultDrive()]->GetInfo(),"CDRom ",6))) {
+            if (!dos_kernel_disabled&&getcwd(dirCur, 512)!=NULL&&(!strncmp(Drives[DOS_GetDefaultDrive()]->GetInfo(),"local ",6)||!strncmp(Drives[DOS_GetDefaultDrive()]->GetInfo(),"CDRom ",6))) {
                 Overlay_Drive *ddp = dynamic_cast<Overlay_Drive*>(Drives[DOS_GetDefaultDrive()]);
                 strcpy(dirNew, ddp!=NULL?ddp->getOverlaydir():Drives[DOS_GetDefaultDrive()]->GetBaseDir());
                 strcat(dirNew, Drives[DOS_GetDefaultDrive()]->curdir);
@@ -2874,6 +3015,8 @@ restart_int:
             c = 489; h = 16; s = 63;
         } else if(disktype=="hd_520") {
             c = 1023; h = 16; s = 63;
+        } else if(disktype=="hd_1gig") {
+            c = 1023; h = 32; s = 63;
         } else if(disktype=="hd_2gig") {
             c = 1023; h = 64; s = 63;
         } else if(disktype=="hd_4gig") { // fseek only supports 2gb
@@ -2970,7 +3113,7 @@ restart_int:
 
         bool setdir=false;
         char dirCur[512], dirNew[512];
-        if (getcwd(dirCur, 512)!=NULL&&!strncmp(Drives[DOS_GetDefaultDrive()]->GetInfo(),"local directory", 15)) {
+        if (!dos_kernel_disabled&&getcwd(dirCur, 512)!=NULL&&!strncmp(Drives[DOS_GetDefaultDrive()]->GetInfo(),"local directory", 15)) {
             Overlay_Drive *ddp = dynamic_cast<Overlay_Drive*>(Drives[DOS_GetDefaultDrive()]);
             strcpy(dirNew, ddp!=NULL?ddp->getOverlaydir():Drives[DOS_GetDefaultDrive()]->GetBaseDir());
             strcat(dirNew, Drives[DOS_GetDefaultDrive()]->curdir);
@@ -2991,13 +3134,13 @@ restart_int:
         if (f){
             fclose(f);
             if (!ForceOverwrite) {
-                WriteOut(MSG_Get("PROGRAM_IMGMAKE_FILE_EXISTS"),temp_line.c_str());
+                if (!dos_kernel_disabled) WriteOut(MSG_Get("PROGRAM_IMGMAKE_FILE_EXISTS"),temp_line.c_str());
                 if (setdir) chdir(dirCur);
                 return;
             }
         }
 
-        WriteOut(MSG_Get("PROGRAM_IMGMAKE_PRINT_CHS"),temp_line.c_str(),c,h,s);
+        if (!dos_kernel_disabled) WriteOut(MSG_Get("PROGRAM_IMGMAKE_PRINT_CHS"),temp_line.c_str(),c,h,s);
         LOG_MSG(MSG_Get("PROGRAM_IMGMAKE_PRINT_CHS"),temp_line.c_str(),c,h,s);
 
         // do it again for fixed chs values
@@ -3006,7 +3149,7 @@ restart_int:
         // create the image file
         f = fopen64(temp_line.c_str(),"wb+");
         if (!f) {
-            WriteOut(MSG_Get("PROGRAM_IMGMAKE_CANNOT_WRITE"),temp_line.c_str());
+            if (!dos_kernel_disabled) WriteOut(MSG_Get("PROGRAM_IMGMAKE_CANNOT_WRITE"),temp_line.c_str());
             if (setdir) chdir(dirCur);
             return;
         }
@@ -3016,7 +3159,7 @@ restart_int:
 #else
         if(fseeko64(f,static_cast<off_t>(size - 1ull),SEEK_SET)) {
 #endif
-            WriteOut(MSG_Get("PROGRAM_IMGMAKE_NOT_ENOUGH_SPACE"),size);
+            if (!dos_kernel_disabled) WriteOut(MSG_Get("PROGRAM_IMGMAKE_NOT_ENOUGH_SPACE"),size);
             fclose(f);
             unlink(temp_line.c_str());
             if (setdir) chdir(dirCur);
@@ -3024,7 +3167,7 @@ restart_int:
         }
         uint8_t bufferbyte=0;
         if(fwrite(&bufferbyte,1,1,f)!=1) {
-            WriteOut(MSG_Get("PROGRAM_IMGMAKE_NOT_ENOUGH_SPACE"),size);
+            if (!dos_kernel_disabled) WriteOut(MSG_Get("PROGRAM_IMGMAKE_NOT_ENOUGH_SPACE"),size);
             fclose(f);
             unlink(temp_line.c_str());
             if (setdir) chdir(dirCur);
@@ -3486,6 +3629,12 @@ static void IMGMAKE_ProgramStart(Program * * make) {
     *make=new IMGMAKE;
 }
 
+void runImgmake(const char *str) {
+	IMGMAKE imgmake;
+	imgmake.cmd=new CommandLine("IMGMAKE", str);
+	imgmake.Run();
+}
+
 // LOADFIX
 
 class LOADFIX : public Program {
@@ -3495,16 +3644,36 @@ public:
 
 bool XMS_Active(void);
 Bitu XMS_AllocateMemory(Bitu size, uint16_t& handle);
+Bitu XMS_FreeMemory(Bitu handle);
+uint8_t EMM_AllocateMemory(uint16_t pages,uint16_t & dhandle,bool can_allocate_zpages);
+uint8_t EMM_ReleaseMemory(uint16_t handle);
+bool EMS_Active(void);
+
+/* HIMEM.SYS does not store who owns what block, so for -D or -F to work,
+ * we need to keep track of handles ourself */
+std::vector<uint16_t>       LOADFIX_xms_handles;
+std::vector<uint16_t>       LOADFIX_ems_handles;
+
+void LOADFIX_OnDOSShutdown(void) {
+    LOADFIX_xms_handles.clear();
+    LOADFIX_ems_handles.clear();
+}
 
 void LOADFIX::Run(void) 
 {
     uint16_t commandNr  = 1;
     Bitu kb             = 64;
     bool xms            = false;
+    bool ems            = false;
     bool opta           = false;
 
     if (cmd->FindExist("-xms",true) || cmd->FindExist("/xms",true)) {
         xms = true;
+        kb = 1024;
+    }
+
+    if (cmd->FindExist("-ems",true) || cmd->FindExist("/ems",true)) {
+        ems = true;
         kb = 1024;
     }
 
@@ -3521,8 +3690,21 @@ void LOADFIX::Run(void)
             char ch = temp_line[1];
             if ((*upcase(&ch)=='D') || (*upcase(&ch)=='F')) {
                 // Deallocate all
-                if (xms) {
-                    WriteOut("XMS deallocation not yet implemented\n");
+                if (ems) {
+                    for (auto i=LOADFIX_ems_handles.begin();i!=LOADFIX_ems_handles.end();i++) {
+                        if (EMM_ReleaseMemory(*i))
+                            WriteOut("XMS handle %u: unable to free",*i);
+                    }
+                    LOADFIX_ems_handles.clear();
+                    WriteOut(MSG_Get("PROGRAM_LOADFIX_DEALLOCALL"),kb);
+                }
+                else if (xms) {
+                    for (auto i=LOADFIX_xms_handles.begin();i!=LOADFIX_xms_handles.end();i++) {
+                        if (XMS_FreeMemory(*i))
+                            WriteOut("XMS handle %u: unable to free",*i);
+                    }
+                    LOADFIX_xms_handles.clear();
+                    WriteOut(MSG_Get("PROGRAM_LOADFIX_DEALLOCALL"),kb);
                 }
                 else {
                     DOS_FreeProcessMemory(0x40);
@@ -3539,7 +3721,28 @@ void LOADFIX::Run(void)
     }
 
     // Allocate Memory
-    if (xms) {
+    if (ems) {
+        if (EMS_Active()) {
+            uint16_t handle;
+            Bitu err;
+
+            /* EMS allocates in 16kb increments */
+            kb = (kb + 15u) & (~15u);
+
+            err = EMM_AllocateMemory(kb/16u/*16KB pages*/,/*&*/handle,false);
+            if (err == 0) {
+                WriteOut("EMS block allocated (%uKB)\n",kb);
+                LOADFIX_ems_handles.push_back(handle);
+            }
+            else {
+                WriteOut("Unable to allocate EMS block\n");
+            }
+        }
+        else {
+            WriteOut("EMS not active\n");
+        }
+    }
+    else if (xms) {
         if (XMS_Active()) {
             uint16_t handle;
             Bitu err;
@@ -3547,6 +3750,7 @@ void LOADFIX::Run(void)
             err = XMS_AllocateMemory(kb,/*&*/handle);
             if (err == 0) {
                 WriteOut("XMS block allocated (%uKB)\n",kb);
+                LOADFIX_xms_handles.push_back(handle);
             }
             else {
                 WriteOut("Unable to allocate XMS block\n");
@@ -3561,10 +3765,17 @@ void LOADFIX::Run(void)
         uint16_t blocks = (uint16_t)(kb*1024/16);
         if (DOS_AllocateMemory(&segment,&blocks)) {
             DOS_MCB mcb((uint16_t)(segment-1));
-            if (opta && segment < 0x1000) {
-                uint16_t needed = 0x1000 - segment;
-                if (DOS_ResizeMemory(segment,&needed))
-                    kb=needed*16/1024;
+            if (opta) {
+                if (segment < 0x1000) {
+                    uint16_t needed = 0x1000 - segment;
+                    if (DOS_ResizeMemory(segment,&needed))
+                        kb=needed*16/1024;
+                }
+                else {
+                    DOS_FreeMemory(segment);
+                    WriteOut("Lowest MCB is above 64KB, nothing allocated\n");
+                    return;
+                }
             }
             mcb.SetPSPSeg(0x40);            // use fake segment
             WriteOut(MSG_Get("PROGRAM_LOADFIX_ALLOC"),kb);
@@ -4266,9 +4477,9 @@ public:
             WriteOut(MSG_Get("PROGRAM_IMGMOUNT_FORMAT_UNSUPPORTED"),fstype.c_str());
             return;
         }
-            
+
         // find all file parameters, assuming that all option parameters have been removed
-        ParseFiles(temp_line, paths, el_torito != "" || type == "ram");
+        bool removed=ParseFiles(temp_line, paths, el_torito != "" || type == "ram");
 
         // some generic checks
         if (el_torito != "") {
@@ -4292,7 +4503,7 @@ public:
 				char ext[5];
 				strncpy(ext, paths[0].substr(paths[0].length()-4).c_str(), 4);
 				ext[4]=0;
-				if (!strcasecmp(ext, ".iso")||!strcasecmp(ext, ".cue")||!strcasecmp(ext, ".bin")||!strcasecmp(ext, ".chd")||!strcasecmp(ext, ".mdf")) {
+				if (!strcasecmp(ext, ".iso")||!strcasecmp(ext, ".cue")||!strcasecmp(ext, ".bin")||!strcasecmp(ext, ".chd")||!strcasecmp(ext, ".mdf")||!strcasecmp(ext, ".gog")||!strcasecmp(ext, ".ins")) {
 					type="iso";
 					fstype="iso";
 				} else if (!strcasecmp(ext, ".ima")) {
@@ -4302,6 +4513,8 @@ public:
 			}
         }
 
+        int i_drive = drive - 'A';
+        bool exist = i_drive < DOS_DRIVES && i_drive >= 0 && Drives[i_drive];
         //====== call the proper subroutine ======
         if(fstype=="fat") {
             //mount floppy or hard drive
@@ -4315,6 +4528,7 @@ public:
                 //supports multiple files
                 if (!MountFat(sizes, drive, type == "hdd", str_size, paths, ide_index, ide_slave, reserved_cylinders, roflag)) return;
             }
+            if (removed && !exist && i_drive < DOS_DRIVES && i_drive >= 0 && Drives[i_drive]) DOS_SetDefaultDrive(i_drive);
         } else if (fstype=="iso") {
             if (el_torito != "") {
                 WriteOut("El Torito bootable CD: -fs iso mounting not supported\n"); /* <- NTS: Will never implement, either */
@@ -4322,6 +4536,7 @@ public:
             }
             //supports multiple files
             if (!MountIso(drive, paths, ide_index, ide_slave)) return;
+            if (removed && !exist && i_drive < DOS_DRIVES && i_drive >= 0 && Drives[i_drive]) DOS_SetDefaultDrive(i_drive);
         } else if (fstype=="none") {
             unsigned char driveIndex = drive - '0';
 
@@ -4346,7 +4561,7 @@ public:
                 newImage = MountImageNoneRam(sizes, reserved_cylinders, driveIndex < 2);
             }
             else {
-                newImage = MountImageNone(paths[0].c_str(), sizes, reserved_cylinders, roflag);
+                newImage = MountImageNone(paths[0].c_str(), NULL, sizes, reserved_cylinders, roflag);
             }
             if (newImage == NULL) return;
             newImage->Addref();
@@ -4375,7 +4590,7 @@ public:
                             swapInDisksSpecificDrive = driveIndex;
 
                             for (size_t si=1;si < MAX_SWAPPABLE_DISKS && si < paths.size();si++) {
-                                imageDisk *img = MountImageNone(paths[si].c_str(), sizes, reserved_cylinders, roflag);
+                                imageDisk *img = MountImageNone(paths[si].c_str(), NULL, sizes, reserved_cylinders, roflag);
 
                                 if (img != NULL) {
                                     diskSwap[si] = img;
@@ -4482,9 +4697,10 @@ private:
         }
         return true;
     }
-    void ParseFiles(std::string &commandLine, std::vector<std::string> &paths, bool nodef) {
+    bool ParseFiles(std::string &commandLine, std::vector<std::string> &paths, bool nodef) {
 		char drive=commandLine[0];
-        while (cmd->FindCommand((unsigned int)(paths.size() + 1), commandLine)) {
+        bool nocont=false;
+        while (!nocont&&cmd->FindCommand((unsigned int)(paths.size() + 1), commandLine)) {
 			bool usedef=false;
 			if (!cmd->FindCommand((unsigned int)(paths.size() + 2), commandLine) || !commandLine.size()) {
 				if (!nodef && !paths.size()) {
@@ -4494,7 +4710,22 @@ private:
 				else break;
 			}
 #if defined (WIN32) || defined(OS2)
-            /* nothing */
+            // Windows: Workaround for LaunchBox
+            if (commandLine.size()>4 && commandLine[0]=='\'' && toupper(commandLine[1])>='A' && toupper(commandLine[1])<='Z' && commandLine[2]==':' && (commandLine[3]=='/' || commandLine[3]=='\\') && commandLine.back()=='\'')
+                commandLine = commandLine.substr(1, commandLine.size()-2);
+            else if (!paths.size() && commandLine.size()>3 && commandLine[0]=='\'' && toupper(commandLine[1])>='A' && toupper(commandLine[1])<='Z' && commandLine[2]==':' && (commandLine[3]=='/' || commandLine[3]=='\\')) {
+                std::string line=trim((char *)cmd->GetRawCmdline().c_str());
+                std::size_t space=line.find(' ');
+                if (space!=std::string::npos) {
+                    line=trim((char *)line.substr(space).c_str());
+                    std::size_t found=line.back()=='\''?line.find_last_of('\''):line.rfind("' ");
+                    if (found!=std::string::npos&&found>2) {
+                        commandLine=line.substr(1, found-1);
+                        nocont=true;
+                        if (line.size()>3 && !strcasecmp(line.substr(line.size()-3).c_str(), " -u")) Unmount(drive);
+                    }
+                }
+            }
 #else
             // Linux: Convert backslash to forward slash
             if (commandLine.size() > 0) {
@@ -4506,15 +4737,25 @@ private:
 #endif
 
 			if (!strcasecmp(commandLine.c_str(), "-u")) {
+                bool exist = toupper(drive) - 'A' == DOS_GetDefaultDrive();
 				Unmount(drive);
-				return;
+				return exist && drive - 'A' != DOS_GetDefaultDrive();
 			}
 
-            pref_struct_stat test;
 			char fullname[CROSS_LEN];
 			char tmp[CROSS_LEN];
 			safe_strncpy(tmp, wpcolon&&commandLine.length()>1&&commandLine[0]==':'?commandLine.c_str()+1:commandLine.c_str(), CROSS_LEN);
+            bool useh = false;
+            pref_struct_stat test;
+#if defined(WIN32)
+            ht_stat_t htest;
+            const host_cnv_char_t* host_name = CodePageGuestToHost(tmp);
+            if (pref_stat(tmp, &test) && (host_name == NULL || ht_stat(host_name, &htest))) {
+                if (pref_stat(tmp, &test) && host_name != NULL) useh = true;
+#else
+            pref_struct_stat htest;
             if (pref_stat(tmp, &test)) {
+#endif
                 //See if it works if the ~ are written out
                 std::string homedir(commandLine);
                 Cross::ResolveHomedir(homedir);
@@ -4526,13 +4767,13 @@ private:
                     uint8_t dummy;
                     if (!DOS_MakeName(tmp, fullname, &dummy) || strncmp(Drives[dummy]->GetInfo(), "local directory", 15)) {
                         if (!qmount) WriteOut(MSG_Get(usedef?"PROGRAM_IMGMOUNT_DEFAULT_NOT_FOUND":"PROGRAM_IMGMOUNT_NON_LOCAL_DRIVE"));
-                        return;
+                        return false;
                     }
 
                     localDrive *ldp = dynamic_cast<localDrive*>(Drives[dummy]);
                     if (ldp == NULL) {
                         if (!qmount) WriteOut(MSG_Get(usedef?"PROGRAM_IMGMOUNT_DEFAULT_NOT_FOUND":"PROGRAM_IMGMOUNT_FILE_NOT_FOUND"));
-                        return;
+                        return false;
                     }
 					bool readonly=wpcolon&&commandLine.length()>1&&commandLine[0]==':';
                     ldp->GetSystemFilename(readonly?tmp+1:tmp, fullname);
@@ -4541,16 +4782,17 @@ private:
 
                     if (pref_stat(readonly?tmp+1:tmp, &test)) {
                         if (!qmount) WriteOut(MSG_Get(usedef?"PROGRAM_IMGMOUNT_DEFAULT_NOT_FOUND":"PROGRAM_IMGMOUNT_FILE_NOT_FOUND"));
-                        return;
+                        return false;
                     }
                 }
             }
-            if (S_ISDIR(test.st_mode)&&!usedef) {
+            if (S_ISDIR(useh?htest.st_mode:test.st_mode)&&!usedef) {
                 WriteOut(MSG_Get("PROGRAM_IMGMOUNT_MOUNT"));
-                return;
+                return false;
             }
             paths.push_back(commandLine);
         }
+        return false;
     }
 
     bool Unmount(char &letter) {
@@ -4854,6 +5096,8 @@ private:
         std::vector<DOS_Drive*> imgDisks;
         std::vector<std::string>::size_type i;
         std::vector<DOS_Drive*>::size_type ct;
+        FILE *diskfiles[MAX_SWAPPABLE_DISKS];
+        for (i = 0; i < MAX_SWAPPABLE_DISKS; i++) diskfiles[i]=NULL;
 
         for (i = 0; i < paths.size(); i++) {
             const char* errorMessage = NULL;
@@ -4919,7 +5163,7 @@ private:
                         }
                     }
                 }
-                if (!skipDetectGeometry && !DetectGeometry(paths[i].c_str(), sizes, roflag)) {
+                if (!skipDetectGeometry && !DetectGeometry(NULL, paths[i].c_str(), sizes)) {
                     errorMessage = (char*)("Unable to detect geometry\n");
                 }
             }
@@ -4942,11 +5186,13 @@ private:
                     errorMessage = (char*)MSG_Get("PROGRAM_IMGMOUNT_CANT_CREATE");
 					if (fdrive->req_ver_major>0) {
 						static char ver_msg[150];
-						sprintf(ver_msg, "This operation requires DOS version %u.%u or higher.\n%s", fdrive->req_ver_major, fdrive->req_ver_minor, errorMessage);
+						sprintf(ver_msg, "Mounting this image file requires a reported DOS version of %u.%u or higher.\n%s", fdrive->req_ver_major, fdrive->req_ver_minor, errorMessage);
 						errorMessage = ver_msg;
 					}
-                } else if ((vhdImage&&ro)||roflag)
-                    fdrive->readonly=true;
+                } else {
+                    diskfiles[i]=fdrive->loadedDisk->diskimg;
+                    if ((vhdImage&&ro)||roflag) fdrive->readonly=true;
+                }
             }
             if (errorMessage) {
                 if (!qmount) WriteOut(errorMessage);
@@ -4986,7 +5232,7 @@ private:
                         swapInDisksSpecificDrive = driveIndex;
 
                         for (size_t si=1;si < MAX_SWAPPABLE_DISKS && si < paths.size();si++) {
-                            imageDisk *img = MountImageNone(paths[si].c_str(), sizes, reserved_cylinders, roflag);
+                            imageDisk *img = MountImageNone(paths[si].c_str(), diskfiles[si], sizes, reserved_cylinders, roflag);
 
                             if (img != NULL) {
                                 diskSwap[si] = img;
@@ -5076,9 +5322,15 @@ private:
 
     }
 
-    bool DetectGeometry(const char* fileName, Bitu sizes[], bool roflag) {
+    bool DetectGeometry(FILE * file, const char* fileName, Bitu sizes[]) {
         bool yet_detected = false, readonly = wpcolon&&strlen(fileName)>1&&fileName[0]==':';
-        FILE * diskfile = fopen64(readonly?fileName+1:fileName, readonly||roflag?"rb":"rb+");
+        FILE * diskfile = file==NULL?fopen64(readonly?fileName+1:fileName, "rb"):file;
+#if defined(WIN32)
+        if (!diskfile && file==NULL) {
+            const host_cnv_char_t* host_name = CodePageGuestToHost(readonly?fileName+1:fileName);
+            if (host_name != NULL) diskfile = _wfopen(host_name, L"rb");
+        }
+#endif
         if (!diskfile) {
             if (!qmount) WriteOut(MSG_Get("PROGRAM_IMGMOUNT_INVALID_IMAGE"));
             return false;
@@ -5124,7 +5376,7 @@ private:
             if (!qmount) WriteOut(MSG_Get("PROGRAM_IMGMOUNT_INVALID_IMAGE"));
             return false;
         }
-        fclose(diskfile);
+        if (file==NULL) fclose(diskfile);
         // check it is not dynamic VHD image
         if (!strcmp((const char*)buf, "conectix")) {
             if (!qmount) WriteOut(MSG_Get("PROGRAM_IMGMOUNT_DYNAMIC_VHD_UNSUPPORTED"));
@@ -5343,7 +5595,7 @@ private:
         return true;
     }
 
-    imageDisk* MountImageNone(const char* fileName, const Bitu sizesOriginal[], const int reserved_cylinders, bool roflag) {
+    imageDisk* MountImageNone(const char* fileName, FILE* file, const Bitu sizesOriginal[], const int reserved_cylinders, bool roflag) {
         imageDisk* newImage = 0;
         Bitu sizes[4];
         sizes[0] = sizesOriginal[0];
@@ -5380,9 +5632,9 @@ private:
 
 		bool readonly = wpcolon&&strlen(fileName)>1&&fileName[0]==':';
 		const char* fname=readonly?fileName+1:fileName;
-        FILE *newDisk = fopen64(fname, readonly||roflag?"rb":"rb+");
+        FILE *newDisk = file==NULL?fopen_lock(fname, readonly||roflag?"rb":"rb+"):file;
         if (!newDisk) {
-            WriteOut("Unable to open '%s'\n", fname);
+            if (!qmount) WriteOut("Unable to open '%s'\n", fname);
             return NULL;
         }
 
@@ -5462,7 +5714,7 @@ private:
 
         /* try auto-detect */
         if (sizes[3] == 0 && sizes[2] == 0) {
-            DetectGeometry(fname, sizes, roflag); /* NTS: Opens the file again, even though WE have the file open already! */
+            DetectGeometry(newDisk, fname, sizes);
         }
 
         /* auto-fill: sector/track count */
@@ -5986,7 +6238,7 @@ bool AUTOTYPE::ReadDoubleArg(const std::string &name,
 	if (cmd->FindString(flag, str_value, true)) {
 		// Can the user's value be parsed?
 		const double user_value = to_finite<double>(str_value);
-#if defined(MACOSX)
+#if defined(MACOSX) || defined(EMSCRIPTEN)
 		if (isfinite(user_value)) { /* *sigh* Really, clang, really? */
 #else
 		if (std::isfinite(user_value)) {
@@ -6065,6 +6317,39 @@ void AUTOTYPE_ProgramStart(Program **make)
 	*make = new AUTOTYPE;
 }
 
+class ADDKEY : public Program {
+public:
+    void Run(void);
+private:
+	void PrintUsage() {
+        constexpr const char *msg =
+            "Generates artificial keypresses.\n\nADDKEY [pmsec] [key]\n\n"
+            "For example, the command below types \"dir\" followed by ENTER after 1 second:\n\nADDKEY p1000 d i r enter\n\n"
+            "You could also try AUTOTYPE command instead of this command to perform\nscripted keyboard entry into a running DOS program.\n";
+        WriteOut(msg);
+	}
+};
+
+void ADDKEY::Run()
+{
+	// Hack To allow long commandlines
+	ChangeToLongCmd();
+
+	// Usage
+	if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
+		PrintUsage();
+		return;
+	}
+	char *args=(char *)cmd->GetRawCmdline().c_str();
+	args=trim(args);
+	DOS_Shell temp;
+	temp.CMD_ADDKEY(args);
+}
+
+static void ADDKEY_ProgramStart(Program * * make) {
+    *make=new ADDKEY;
+}
+
 class LS : public Program {
 public:
     void Run(void);
@@ -6100,20 +6385,25 @@ static void LS_ProgramStart(Program * * make) {
     *make=new LS;
 }
 
-class ADDKEY : public Program {
+class DELTREE : public Program {
 public:
     void Run(void);
 private:
 	void PrintUsage() {
         constexpr const char *msg =
-            "Generates artificial keypresses.\n\nADDKEY [key]\n\n"
-            "For example, the command below will type \"dir\" followed by ENTER.\n\nADDKEY d i r enter\n\n"
-            "Instead of using this command, you can also try AUTOTYPE command.  AUTOTYPE can\nperform scripted keyboard entry into a running DOS program.\n";
+           "Deletes a directory and all the subdirectories and files in it.\n\n"
+           "To delete one or more files and directories:\n"
+           "DELTREE [/Y] [drive:]path [[drive:]path[...]]\n\n"
+           "  /Y              Suppresses prompting to confirm you want to delete\n"
+           "                  the subdirectory.\n"
+           "  [drive:]path    Specifies the name of the directory you want to delete.\n\n"
+           "Note: Use DELTREE cautiously. Every file and subdirectory within the\n"
+           "specified directory will be deleted.\n";
         WriteOut(msg);
 	}
 };
 
-void ADDKEY::Run()
+void DELTREE::Run()
 {
 	// Hack To allow long commandlines
 	ChangeToLongCmd();
@@ -6126,12 +6416,232 @@ void ADDKEY::Run()
 	char *args=(char *)cmd->GetRawCmdline().c_str();
 	args=trim(args);
 	DOS_Shell temp;
-	temp.CMD_ADDKEY(args);
+	temp.CMD_DELTREE(args);
 }
 
-static void ADDKEY_ProgramStart(Program * * make) {
-    *make=new ADDKEY;
+static void DELTREE_ProgramStart(Program * * make) {
+    *make=new DELTREE;
 }
+
+class TREE : public Program {
+public:
+    void Run(void);
+private:
+	void PrintUsage() {
+        constexpr const char *msg =
+           "Graphically displays the directory structure of a drive or path.\n\n"
+           "TREE [drive:][path] [/F] [/A]\n\n"
+           "  /F   Displays the names of the files in each directory.\n"
+           "  /A   Uses ASCII instead of extended characters.\n";
+        WriteOut(msg);
+	}
+};
+
+void TREE::Run()
+{
+	// Hack To allow long commandlines
+	ChangeToLongCmd();
+
+	// Usage
+	if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
+		PrintUsage();
+		return;
+	}
+	char *args=(char *)cmd->GetRawCmdline().c_str();
+	args=trim(args);
+	DOS_Shell temp;
+	temp.CMD_TREE(args);
+}
+
+static void TREE_ProgramStart(Program * * make) {
+    *make=new TREE;
+}
+
+class COLOR : public Program {
+public:
+    void Run(void);
+private:
+	void PrintUsage() {
+        constexpr const char *msg =
+           "Sets the default console foreground and background colors.\n\n"
+           "COLOR [attr]\n\n"
+           "  attr        Specifies color attribute of console output\n\n"
+           "Color attributes are specified by TWO hex digits -- the first\n"
+           "corresponds to the background; the second to the foreground.\n"
+           "Each digit can be any of the following values:\n\n"
+           "    0 = Black       8 = Gray\n"
+           "    1 = Blue        9 = Light Blue\n"
+           "    2 = Green       A = Light Green\n"
+           "    3 = Aqua        B = Light Aqua\n"
+           "    4 = Red         C = Light Red\n"
+           "    5 = Purple      D = Light Purple\n"
+           "    6 = Yellow      E = Light Yellow\n"
+           "    7 = White       F = Bright White\n\n"
+           "If no argument is given, this command restores the original color.\n\n"
+           "Example: \"COLOR fc\" produces light red on bright white\n";
+        WriteOut(msg);
+	}
+};
+
+void COLOR::Run()
+{
+	// Hack To allow long commandlines
+	ChangeToLongCmd();
+
+	// Usage
+	if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
+		PrintUsage();
+		return;
+	}
+    bool back=false;
+    char fg, bg;
+    int fgc=0, bgc=0;
+	char *args=(char *)cmd->GetRawCmdline().c_str();
+	args=trim(args);
+    if (strlen(args)==2) {
+        bg=args[0];
+        fg=args[1];
+        if (fg=='0'||fg=='8')
+            fgc=30;
+        else if (fg=='1'||fg=='9')
+            fgc=34;
+        else if (fg=='2'||tolower(fg)=='a')
+            fgc=32;
+        else if (fg=='3'||tolower(fg)=='b')
+            fgc=36;
+        else if (fg=='4'||tolower(fg)=='c')
+            fgc=31;
+        else if (fg=='5'||tolower(fg)=='d')
+            fgc=35;
+        else if (fg=='6'||tolower(fg)=='e')
+            fgc=32;
+        else if (fg=='7'||tolower(fg)=='f')
+            fgc=37;
+        else
+            back=true;
+        if (bg=='0'||bg=='8')
+            bgc=40;
+        else if (bg=='1'||bg=='9')
+            bgc=44;
+        else if (bg=='2'||tolower(bg)=='a')
+            bgc=42;
+        else if (bg=='3'||tolower(bg)=='b')
+            bgc=46;
+        else if (bg=='4'||tolower(bg)=='c')
+            bgc=41;
+        else if (bg=='5'||tolower(bg)=='d')
+            bgc=45;
+        else if (bg=='6'||tolower(bg)=='e')
+            bgc=42;
+        else if (bg=='7'||tolower(bg)=='f')
+            bgc=47;
+        else
+            back=true;
+    } else
+       back=true;
+    if (back)
+        WriteOut("[0m");
+    else {
+        bool fgl=fg>='0'&&fg<='7', bgl=bg>='0'&&bg<='7';
+        WriteOut(("["+std::string(fgl||bgl?"0;":"")+std::string(fgl?"":"1;")+std::string(bgl?"":"5;")+std::to_string(fgc)+";"+std::to_string(bgc)+"m").c_str());
+    }
+}
+
+static void COLOR_ProgramStart(Program * * make) {
+    *make=new COLOR;
+}
+
+#if defined(USE_TTF)
+typedef struct {uint8_t red; uint8_t green; uint8_t blue; uint8_t alpha;} alt_rgb;
+alt_rgb altBGR[16], *rgbcolors = (alt_rgb*)render.pal.rgb;
+extern alt_rgb altBGR1[16];
+extern bool colorChanged;
+bool setColors(const char *colorArray, int n);
+void resetFontSize();
+
+class SETCOLOR : public Program {
+public:
+    void Run(void);
+private:
+	void PrintUsage() {
+        constexpr const char *msg =
+            "Views or changes the text-mode color scheme settings.\n\nSETCOLOR [color# [value]]\n\nFor example:\n\n  SETCOLOR 1 (50,50,50)\n\nChange Color #1 to the specified color value\n\n  SETCOLOR 7 -\n\nReturn Color #7 to the default color value\n\n  SETCOLOR MONO\n\nDisplay current MONO mode status\n\nTo change the current background and foreground colors, use COLOR command.\n";
+        WriteOut(msg);
+	}
+};
+
+void SETCOLOR::Run()
+{
+	// Hack To allow long commandlines
+	ChangeToLongCmd();
+
+	// Usage
+	if (cmd->FindExist("-?", false) || cmd->FindExist("/?", false)) {
+		PrintUsage();
+		return;
+	}
+	char *args=(char *)cmd->GetRawCmdline().c_str();
+	if (*args) {
+		args=trim(args);
+		char *p = strchr(args, ' ');
+		if (p!=NULL)
+			*p=0;
+		int i=atoi(args);
+		if (!strcasecmp(args,"MONO")) {
+			if (p==NULL)
+				WriteOut("MONO mode status: %s (video mode %d)\n",CurMode->mode==7?"active":CurMode->mode==3?"inactive":"unavailable",CurMode->mode);
+			else if (!strcmp(trim(p+1),"+")) {
+				if (CurMode->mode!=7) INT10_SetVideoMode(7);
+				WriteOut(CurMode->mode==7?"MONO mode status => active (video mode 7)\n":"Failed to change MONO mode\n");
+			} else if (!strcmp(trim(p+1),"-")) {
+				if (CurMode->mode!=3) INT10_SetVideoMode(3);
+				WriteOut(CurMode->mode==3?"MONO mode status => inactive (video mode 3)\n":"Failed to change MONO mode\n");
+			} else
+				WriteOut("Must be + or - for MONO: %s\n",trim(p+1));
+		} else if (!strcmp(args,"0")||!strcmp(args,"00")||!strcmp(args,"+0")||!strcmp(args,"-0")||i>0&&i<16) {
+			if (p==NULL) {
+                altBGR[i].red = colorChanged&&!IS_VGA_ARCH?altBGR1[i].red:rgbcolors[i].red;
+                altBGR[i].green = colorChanged&&!IS_VGA_ARCH?altBGR1[i].green:rgbcolors[i].green;
+                altBGR[i].blue = colorChanged&&!IS_VGA_ARCH?altBGR1[i].blue:rgbcolors[i].blue;
+                WriteOut("Color %d: (%d,%d,%d) or #%02x%02x%02x\n",i,altBGR[i].red,altBGR[i].green,altBGR[i].blue,altBGR[i].red,altBGR[i].green,altBGR[i].blue);
+            }
+		} else {
+			WriteOut("Invalid color number - %s\n", trim(args));
+			DOS_SetError(DOSERR_DATA_INVALID);
+			return;
+		} if (p!=NULL&&strcasecmp(args,"MONO")) {
+			char value[128];
+			if (strcmp(trim(p+1),"-")) {
+				strncpy(value,trim(p+1),127);
+				value[127]=0;
+			} else
+				strcpy(value,i==0?"#000000":i==1?"#0000aa":i==2?"#00aa00":i==3?"#00aaaa":i==4?"#aa0000":i==5?"#aa00aa":i==6?"#aa5500":i==7?"#aaaaaa":i==8?"#555555":i==9?"#5555ff":i==10?"#55ff55":i==11?"#55ffff":i==12?"#ff5555":i==13?"#ff55ff":i==14?"#ffff55":"#ffffff");
+            if (!ttf.inUse)
+				WriteOut("Changing color scheme is only supported for the TrueType font output.\n");
+			else if (setColors(value,i)) {
+                altBGR[i].red = colorChanged&&!IS_VGA_ARCH?altBGR1[i].red:rgbcolors[i].red;
+                altBGR[i].green = colorChanged&&!IS_VGA_ARCH?altBGR1[i].green:rgbcolors[i].green;
+                altBGR[i].blue = colorChanged&&!IS_VGA_ARCH?altBGR1[i].blue:rgbcolors[i].blue;
+				WriteOut("Color %d => (%d,%d,%d) or #%02x%02x%02x\n",i,altBGR[i].red,altBGR[i].green,altBGR[i].blue,altBGR[i].red,altBGR[i].green,altBGR[i].blue);
+				resetFontSize();
+			} else
+				WriteOut("Invalid color value - %s\n",value);
+			}
+	} else {
+		WriteOut("MONO mode status: %s (video mode %d)\n",CurMode->mode==7?"active":CurMode->mode==3?"inactive":"unavailable",CurMode->mode);
+		for (int i = 0; i < 16; i++) {
+            altBGR[i].red = colorChanged&&!IS_VGA_ARCH?altBGR1[i].red:rgbcolors[i].red;
+            altBGR[i].green = colorChanged&&!IS_VGA_ARCH?altBGR1[i].green:rgbcolors[i].green;
+            altBGR[i].blue = colorChanged&&!IS_VGA_ARCH?altBGR1[i].blue:rgbcolors[i].blue;
+			WriteOut("Color %d: (%d,%d,%d) or #%02x%02x%02x\n",i,altBGR[i].red,altBGR[i].green,altBGR[i].blue,altBGR[i].red,altBGR[i].green,altBGR[i].blue);
+        }
+	}
+}
+
+static void SETCOLOR_ProgramStart(Program * * make) {
+    *make=new SETCOLOR;
+}
+#endif
 
 #if C_DEBUG
 class INT2FDBG : public Program {
@@ -6590,7 +7100,7 @@ void DOS_SetupPrograms(void) {
     MSG_Add("PROGRAM_IMGMOUNT_STATUS_2","The currently mounted drive numbers are:\n");
     MSG_Add("PROGRAM_IMGMOUNT_STATUS_1","The currently mounted FAT/ISO drives are:\n");
     MSG_Add("PROGRAM_IMGMOUNT_STATUS_NONE","No drive available\n");
-    MSG_Add("PROGRAM_MOUNT_ERROR_1","Directory %s doesn't exist.\n");
+    MSG_Add("PROGRAM_MOUNT_ERROR_1","Directory %s does not exist.\n");
     MSG_Add("PROGRAM_MOUNT_ERROR_2","%s is not a directory\n");
     MSG_Add("PROGRAM_MOUNT_IMGMOUNT","To mount image files, use the \033[34;1mIMGMOUNT\033[0m command, not the \033[34;1mMOUNT\033[0m command.\n");
     MSG_Add("PROGRAM_MOUNT_ILL_TYPE","Illegal type %s\n");
@@ -6651,10 +7161,14 @@ void DOS_SetupPrograms(void) {
     MSG_Add("PROGRAM_MOUNT_UMOUNT_SUCCESS","Drive %c has successfully been removed.\n");
     MSG_Add("PROGRAM_MOUNT_UMOUNT_NUMBER_SUCCESS","Drive number %c has successfully been removed.\n");
     MSG_Add("PROGRAM_MOUNT_UMOUNT_NO_VIRTUAL","Virtual Drives can not be unMOUNTed.\n");
-    MSG_Add("PROGRAM_MOUNT_WARNING_WIN","\033[31;1mMounting C:\\ is NOT recommended. Please mount a (sub)directory next time.\033[0m\n");
-    MSG_Add("PROGRAM_MOUNT_WARNING_OTHER","\033[31;1mMounting / is NOT recommended. Please mount a (sub)directory next time.\033[0m\n");
+    MSG_Add("PROGRAM_MOUNT_WARNING_WIN","Warning: Mounting C:\\ is not recommended.\n");
+    MSG_Add("PROGRAM_MOUNT_WARNING_OTHER","Warning: Mounting / is not recommended.\n");
+	MSG_Add("PROGRAM_MOUNT_PHYSFS_ERROR","Failed to mount the PhysFS drive.\n");
 	MSG_Add("PROGRAM_MOUNT_OVERLAY_NO_BASE","Please MOUNT a normal directory first before adding an overlay on top.\n");
 	MSG_Add("PROGRAM_MOUNT_OVERLAY_INCOMPAT_BASE","The overlay is NOT compatible with the drive that is specified.\n");
+	MSG_Add("PROGRAM_MOUNT_OVERLAY_MIXED_BASE","The overlay needs to be specified using the same addressing as the underlying drive. No mixing of relative and absolute paths.");
+	MSG_Add("PROGRAM_MOUNT_OVERLAY_SAME_AS_BASE","The overlay directory can not be the same as underlying drive.\n");
+	MSG_Add("PROGRAM_MOUNT_OVERLAY_ERROR","An error occurred when trying to create an overlay drive.\n");
 	MSG_Add("PROGRAM_MOUNT_OVERLAY_STATUS","Overlay %s on drive %c mounted.\n");
 
     MSG_Add("PROGRAM_LOADFIX_ALLOC","%d kb allocated.\n");
@@ -6663,9 +7177,10 @@ void DOS_SetupPrograms(void) {
     MSG_Add("PROGRAM_LOADFIX_ERROR","Memory allocation error.\n");
     MSG_Add("PROGRAM_LOADFIX_HELP",
         "Reduces the amount of available conventional or XMS memory.\n\n"
-        "LOADFIX [-xms] [-{ram}] [{program}] [{options}]\n"
-        "LOADFIX -f [-xms]\n\n"
+        "LOADFIX [-xms] [-ems] [-{ram}] [{program}] [{options}]\n"
+        "LOADFIX -f [-xms] [-ems]\n\n"
         "  -xms        Allocates memory from XMS rather than conventional memory\n"
+        "  -ems        Allocates memory from EMS rather than conventional memory\n"
         "  -{ram}      Specifies the amount of memory to allocate in KB\n"
         "                 Defaults to 64kb for conventional memory; 1MB for XMS memory\n"
         "  -a          Auto allocates enough memory to fill the lowest 64KB memory\n"
@@ -6900,12 +7415,12 @@ void DOS_SetupPrograms(void) {
         "For this command, one can specify a succession of floppy disks swappable\n"
         "by the menu command, and drive: specifies the mounted drive to boot from.\n"
         "If no drive letter is specified, this defaults to boot from the A drive.\n"
+        "If no parameter is specified, it will try to boot from the current drive.\n"
         "The only bootable drive letters are A, C, and D.  For booting from a hard\n"
         "drive (C or D), ensure the image is already mounted by \033[34;1mIMGMOUNT\033[0m command.\n\n"
-        "The syntax of this command is:\n\n"
+        "The syntax of this command is one of the following:\n\n"
+        "\033[34;1mBOOT [driveletter:]\033[0m\n\n"
         "\033[34;1mBOOT diskimg1.img [diskimg2.img ...] [-L driveletter]\033[0m\n\n"
-		"Or:\n\n"
-        "\033[34;1mBOOT driveletter:\033[0m\n\n"
         "Note: An image file with a leading colon (:) will be booted in write-protected\n"
 		"mode if the \"leading colon write protect image\" option is enabled.\n\n"
         "Examples:\n\n"
@@ -6954,7 +7469,7 @@ void DOS_SetupPrograms(void) {
     MSG_Add("PROGRAM_IMGMOUNT_AUTODET_VALUES","Image geometry auto detection: -size %u,%u,%u,%u\n");
     MSG_Add("PROGRAM_IMGMOUNT_TYPE_UNSUPPORTED","Type \"%s\" is unsupported. Specify \"hdd\" or \"floppy\" or \"iso\".\n");
     MSG_Add("PROGRAM_IMGMOUNT_FORMAT_UNSUPPORTED","Format \"%s\" is unsupported. Specify \"fat\" or \"iso\" or \"none\".\n");
-    MSG_Add("PROGRAM_IMGMOUNT_SPECIFY_FILE","Must specify file-image to mount.\n");
+    MSG_Add("PROGRAM_IMGMOUNT_SPECIFY_FILE","Must specify image file(s) to mount.\n");
     MSG_Add("PROGRAM_IMGMOUNT_FILE_NOT_FOUND","Image file not found.\n");
     MSG_Add("PROGRAM_IMGMOUNT_DEFAULT_NOT_FOUND","Image file not found: IMGMAKE.IMG.\n");
     MSG_Add("PROGRAM_IMGMOUNT_MOUNT","To mount directories, use the \033[34;1mMOUNT\033[0m command, not the \033[34;1mIMGMOUNT\033[0m command.\n");
@@ -6963,7 +7478,7 @@ void DOS_SetupPrograms(void) {
     MSG_Add("PROGRAM_IMGMOUNT_CANT_CREATE","Cannot create drive from file.\n");
     MSG_Add("PROGRAM_IMGMOUNT_CANT_CREATE_PHYSFS","Cannot create PhysFS drive.\n");
     MSG_Add("PROGRAM_IMGMOUNT_MOUNT_NUMBER","Drive number %d mounted as %s\n");
-    MSG_Add("PROGRAM_IMGMOUNT_NON_LOCAL_DRIVE", "The image must be on a host or local drive.\n");
+    MSG_Add("PROGRAM_IMGMOUNT_NON_LOCAL_DRIVE", "The image must be on a host, local or network drive.\n");
     MSG_Add("PROGRAM_IMGMOUNT_MULTIPLE_NON_CUEISO_FILES", "Using multiple files is only supported for cue/iso images.\n");
 
     MSG_Add("PROGRAM_IMGMOUNT_HELP",
@@ -7029,8 +7544,8 @@ void DOS_SetupPrograms(void) {
         "    \033[33;1mFloppy disk templates\033[0m (names resolve to floppy sizes in KB or fd=fd_1440):\n"
         "     fd_160 fd_180 fd_200 fd_320 fd_360 fd_400 fd_720 fd_1200 fd_1440 fd_2880\n"
         "    \033[33;1mHard disk templates:\033[0m\n"
-        "     hd_250: 250MB image, hd_520: 520MB image, hd_2gig: 2GB image\n"
-        "     hd_4gig:  4GB image, hd_8gig: 8GB image (maximum size)\n"
+        "     hd_250: 250MB image, hd_520: 520MB image, hd_1gig: 1GB image\n"
+        "     hd_2gig: 2GB image, hd_4gig: 4GB image, hd_8gig: 8GB image\n"
         "     hd_st251: 40MB image, hd_st225: 20MB image (geometry from old drives)\n"
         "    \033[33;1mCustom hard disk images:\033[0m hd (requires -size or -chs)\n"
         "  -size: Size of a custom hard disk image in MB.\n"
@@ -7118,6 +7633,9 @@ void DOS_SetupPrograms(void) {
         PROGRAMS_MakeFile("KEYB.COM", KEYB_ProgramStart);
         PROGRAMS_MakeFile("MODE.COM", MODE_ProgramStart);
         PROGRAMS_MakeFile("MOUSE.COM", MOUSE_ProgramStart);
+#if defined(USE_TTF)
+        PROGRAMS_MakeFile("SETCOLOR.COM", SETCOLOR_ProgramStart);
+#endif
 	}
 
     PROGRAMS_MakeFile("LS.COM",LS_ProgramStart);
@@ -7125,6 +7643,8 @@ void DOS_SetupPrograms(void) {
     PROGRAMS_MakeFile("ADDKEY.COM",ADDKEY_ProgramStart);
     PROGRAMS_MakeFile("A20GATE.COM",A20GATE_ProgramStart);
     PROGRAMS_MakeFile("CFGTOOL.COM",CFGTOOL_ProgramStart);
+    PROGRAMS_MakeFile("COLOR.COM",COLOR_ProgramStart);
+    PROGRAMS_MakeFile("DELTREE.EXE",DELTREE_ProgramStart);
     PROGRAMS_MakeFile("FLAGSAVE.COM", FLAGSAVE_ProgramStart);
 #if defined C_DEBUG
     PROGRAMS_MakeFile("INT2FDBG.COM",INT2FDBG_ProgramStart);
@@ -7145,5 +7665,6 @@ void DOS_SetupPrograms(void) {
     if (startcmd)
         PROGRAMS_MakeFile("START.COM", START_ProgramStart);
 #endif
+    PROGRAMS_MakeFile("TREE.COM", TREE_ProgramStart);
     PROGRAMS_MakeFile("AUTOTYPE.COM", AUTOTYPE_ProgramStart);
 }
