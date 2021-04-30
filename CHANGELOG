@@ -1,5 +1,1800 @@
+0.83.13
+  - DOSBox-X can now resolve file paths in its config
+    options that include environment variables on non-
+    Windows platforms (e.g. ${HOME}..) as well. A new
+    config option "resolve config path" (in [dosbox]
+    section) is added to control path resolving in the
+    config file (e.g. to resolve tildes only by setting
+    to "tilde", or disable all path resolving). (Wengier)
+  - System menu text in Windows builds now match the text
+    in the drop-down menus to be translatable. (Wengier)
+  - The error "Access Denied" is returned instead of
+    "File not found" for files opened exclusively in
+    another program on mounted local drives. (Wengier)
+  - S386C928 hardware cursor fixed to divide X coordinate
+    by bytes per pixel indicated in the control register
+    to match apparent Windows 3.1/95 behavior. Cursor
+    now tracks host properly even in highcolor/truecolor
+    modes.
+  - Added support for the RetroWave OPL3 hardware player.
+    Set "oplemu=retrowave_opl3" in [sblaster] section of
+    the config file to use it. Config options including
+    "retrowave_bus", "retrowave_spi_cs", "retrowave_port"
+    are added to adjust its settings. (ClassicOldSong)
+  - Added support for S386C928 hardware cursor color
+    selection in 256-color mode, which is different
+    from later cards.
+  - S3 XGA "BYTE SWP" fixed only to byte swap if the
+    transfer is 16-bit wide. This fixes the dither
+    pattern drawn by Windows 95/98 when you select
+    "Shutdown" from the Start menu.
+  - IMGMAKE command is now disabled in the secure mode,
+    similar to commands like IMGMOUNT. (Wengier)
+  - Added config options "working directory option" and
+    "working directory default" in [dosbox] section of
+    the config file to provide various options for the
+    users to control DOSBox-X's working directory. For
+    example, DOSBox-X can use the primary config file
+    directory or the DOSBox-X program directory as its
+    working directory. You can view the DOSBox-X'safe
+    working directory with CONFIG -L command. DOSBox-X
+    is also able to save the working directory that a
+    user selects to global config files. (Wengier)
+  - DOSBox-X will now also try to read the config file
+    named dosbox-x.conf in the user config directory
+    when searching for config files at start.
+  - Added new command-line options -promptfolder and
+    -nopromptfolder which will cause the folder prompt
+    dialogs to show or not to show at startup.
+  - Mac OS X builds will prompt the user to select a
+    folder at startup if run from the Finder (or from
+    the root directory). The folder selected will then
+    become the current working directory of DOSBox-X.
+    This makes it possible to start DOSBox-X with a
+    config file of your choice and to control where
+    the capture, save states and other files go.
+  - Fixed Tseng ET4000 640x480 256-color SVGA mode
+    when using the ET4000.BIN VGA BIOS, or Windows 98.
+  - Added segment limit checks in Normal core for
+    MOVSB/MOVSW/MOVSD and STOSB/STOSW/STOSD, which is
+    needed for DOSBox-X to work with the Windows 3.1
+    S3 86C928 display drivers that use segment limit
+    exceptions to fake a linear framebuffer.
+  - Added S3 XGA "byte swap" emulation, needed for
+    correct menu/titlebar display in Windows 3.1 when
+    using the S3 86C928 driver.
+  - Added YUV (YUY2) overlay to S3 Trio64V+ card
+    emulation. Tested with XingMPEG under Windows 3.1
+    and ActiveMovie under Windows 98.
+  - Added machine types for 5 different variations of
+    S3 chipset: Vision864, Vision868, Trio32, Trio64,
+    and (experimental) Trio64V+, ViRGE, ViRGE/VX, and
+    S3 86C928.
+  - Removed second PCI BAR for S3 MMIO register space.
+    S3 datasheets do not show a second BAR. Windows 95
+    is perfectly happy without it.
+  - S3 SVGA XGA emulation BlitRect now supports
+    COLOR_CMP. DirectX-based Windows 95 games are now
+    able to blit in 256-color mode with a transparent
+    color key value.
+  - ANSI.SYS emulaion now supports the "Device Status
+    Report" escape when asked through code 6 (report
+    cursor position)
+  - Fixed RAM mapping bugs related to MDA/CGA/Hercules
+    emulation and the "allow more than 640kb" option,
+    that failed to map RAM as expected, and because of
+    that, easily triggered a "corrupt MCB chain" error
+    message.
+  - Worked around the mounting issue for disk or CD
+    image files with LaunchBox, by allowing a mounting
+    command-line with single quotes like IMGMOUNT D
+    'X:\FILES\DOS.IMG' on Windows systems. (Wengier)
+  - Restored Pentium MMX emulation code for the dynamic
+    x86 core to that of version 0.83.11 for better
+    compatibility with some Windows 9x games. (Wengier)
+  - Added "compresssaveparts" config option (in the
+    [dosbox] section) which when set to false will not
+    compress the components in saved states. (Wengier)
+  - When the current reported DOS version is less than
+    7.x and the user tries to mount a LBA or FAT32 disk
+    image, DOSBox-X will now show a message to ask if
+    the user wants it to set the required DOS version
+    automatically and proceed. (Wengier)
+  - DOSBox-X will now show the folder mounted after
+    mounting to a drive from the menu. (Wengier)
+  - Fixed MOUNT and IMGMOUNT commands unable to mount
+    directories or image files that contain non-ASCII
+    characters in the code page on Windows. (Wengier)
+  - Fixed the cycle information on the title bar when
+    the Turbo mode is enabled. (Wengier)
+  - Fixed that some games using the DOS4GW Extender
+    may not work due to swap file issue. (Wengier)
+  - Fixed that the clipboard copy and paste may not
+    work when the current code page is 808 or 872
+    and you are using Windows. (Wengier)
+  - Fixed the handling of the "Save & Restart" button
+    in Configuration Tool when using Direct3D output
+    in Windows SDL2 builds. (Wengier)
+  - Fixed incorrect display issue when using TrueType
+    font (TTF) output with customized screen dimension
+    when fastbioslogo=true is set. (Wengier)
+  - Fixed CD audio not looping for individual tracks
+    in games like Alien Trilogy. (kcgen)
+  - The command "MIXER /LISTMIDI" now lists the ROM
+    directory/files and sound fonts for MT32, Synth
+    and FluidSynth MIDI device when active. (Wengier)
+  - Debugger "DOS XMS" command will only list handles
+    that are allocated, or with nonzero address or
+    nonzero size, to avoid showing irrelevant
+    information. (joncampbell123)
+  - Added LOADFIX -EMS option to allocate/free
+    EMS (expanded memory). (joncampbell123)
+  - LOADFIX -D -XMS will free all XMS blocks
+    allocated by LOADFIX -XMS. (joncampbell123)
+  - LOADFIX -A will not allocate memory unless there
+    is memory below 64KB to fill. (joncampbell123)
+  - INT 15h PS/2 mouse functions now clear pending
+    PS/2 mouse interrupt as part of the BIOS call.
+    This should resolve unresponsive mouse issues
+    with Windows 3.1. (joncampbell123)
+  - Add config option "mt32.model" in the [midi]
+    section to force a MT-32 model to use. (Wengier)
+  - Updated the MUNT MT-32 library to the latest
+    version 2.5.0. (Wengier)
+  - Updated FLAC decoder library to the latest version
+    (0.12.29 by David Reid). (Wengier)
+  - Integrated SVN commits (Allofich)
+    - r4436, r4437: Rewrite store integer instructions
+    to check if the result fits.(vogons 78127)
+    - r4447: Attribute Controller port alias on EGA
+    machine. Fixes EGA display of older Super Pac-Man
+    release.
+0.83.12
+  - Tandy graphics emulation fixed to accept 8 bits
+    for vertical total and vertical display CRTC
+    registers, which is needed for the tweaked
+    graphics mode used by Math Rabbit to display
+    correctly.
+  - INT 10h will no longer fill in three fields in
+    the BIOS data area (video CTL, char height, and
+    video switches) unless the machine type is
+    EGA or VGA. Those fields do not exist otherwise.
+    Certain games like Mindscape's "Road Runner" game
+    require those fields to be zero as part of it's
+    Tandy detection routine.
+  - PCjr mode will omit the reserved graphics RAM
+    MCB block, and will subtract 16KB from the top
+    at the BIOS level, if emulating 128KB system
+    memory or less.
+  - You can now run PCjr mode with as little as
+    128KB of RAM. Removed 256KB minimum check from
+    DOS kernel. Certain games (Mickey's Space
+    Adventure) require memsizekb=128 and memsize=0
+    in PCjr mode or else it will not work correctly
+    due to how the game locates video system memory.
+  - Fixed Tandy mode to place video memory at the
+    top of conventional memory and allow running
+    Tandy mode with a memsizekb setting as low as
+    64KB, though 256KB or higher is recommended.
+  - Added Tandy "real memory size" field in the
+    BIOS data area.
+  - Tandy emulation updated to subtract 16KB from
+    top of conventional memory, which fixes some
+    games and follows DOSBox SVN behavior and real
+    hardware according to others on the Vogons forums.
+  - Fixed bug that limited Tandy mode to 624KB of
+    conventional memory. 32KB of video RAM is taken
+    from top of memory, losing half of the 32KB
+    breaks games that write to the system RAM instead
+    of B800:0000 segment and causes half the graphics
+    to not render.
+  - CD-ROM image emulation now supports ISO images
+    that are 2GB or larger, 32-bit integer size limit
+    has been lifted.
+  - Increased upper limit of "prebuffer" config option
+    (in [mixer] section) from 100 to 250. It is still
+    recommended to set a value less than 100. (Wengier)
+  - Added scrollbar buttons to the Configuration Tool,
+    so that the scrollbars better resemble the style of
+    the Windows 3.1 scrollbars.
+  - The help window for the Configuration Tool will now
+    display possible and default values for the config
+    options in addition to the descriptions. (Wengier)
+  - Updated the MMX patch code by kekko. (Wengier)
+  - MIXER command now supports the /GUI option to show
+    a popup window to display the mixer information.
+    Also improved its /LISTMIDI option which will show
+    the name of the current MIDI handler and you can
+    optionally specify a MIDI handler name (win32/alsa)
+    to show the information for this handler. (Wengier)
+  - Improved the compatibility of AUTOTYPE command with
+    games like Asterix & Obelix. (Wengier)
+  - The config options ttf.wpbg, ttf.bold, ttf.italic,
+    ttf.underline, ttf.strikeout, and ttf.char512 can
+    now be modified dynamically with CONFIG -SET ...
+    commands, e.g. CONFIG -SET ttf.wpbg=2. (Wengier)
+  - The minimal value for the ttf.ptsize config option
+    has been decreased from 10 to 9. (Wengier)
+  - Added menu item "Save logging as..." (under "Help"
+    -> "Debugging options") to save the current logging
+    content to the specified file. (Wengier)
+  - Added slirp backend support for the NE2000 network
+    feature (in addition to the existing pcap backend).
+    There are config sections named [ethernet, slirp]
+    and [ethernet, pcap] now to set the options for the
+    slirp and pcap backends respectively. Please refer
+    to the networking guide in the DOSBox-X Wiki for
+    more information about the backends. (Jookia)
+  - FAT driver can now support PC-98 HDI images with
+    partitions that start at any physical sector even
+    if the start is not a multiple of the ratio of
+    logical to physical sector size. This allows the
+    HDI image of Dragon Knight 4 to mount.
+  - Control character 7 (BEEP) is now allowed while
+    executing batch files without warnings. (Wengier)
+  - With the setting "core=auto" DOSBox-X now updates
+    the menu in the "CPU core" menu group automatically
+    between "Normal core" and "Dynamic core" to reflect
+    the CPU core which is currently in use. (Wengier)
+  - Fixed Windows 95/98 installation failures caused by
+    FAT driver and DOS API changes in previous version.
+  - Fixed well-intended but erroneous fall through case
+    in the INT15 handler that prevented 3rd party mouse
+    drivers from detecting the PS/2 mouse.
+  - Fixed the color issue with the Configuration Tool
+    in the macOS SDL1 build. (ant_222)
+  - Fixed switching ttf.cols, ttf.lins, and ttf.font
+    options dynamically in full-screen mode. (Wengier)
+  - Fixed menu options "Increase TTF font size" and
+    "Decrease TTF font size" (both under "Video" =>
+    "TTF options") not working (but keyboard shortcuts
+    and those in the system menu work). (Wengier)
+  - Fixed setting option "ttf.wp=xy3" or "ttf.wp=xy4"
+    not working (but "ttf.wp=xy" did work). (Wengier)
+  - Fixed preview function in WordStar not working for
+    TrueType font output in previous version. (Wengier)
+  - Fixed the issue that caused Windows 3.x group file
+    corruption on hard disk image files. (SnikoLoft)
+  - Integrated SVN commits (Allofich)
+    - r4416: Added ability to start and stop avi
+    recording, and to start keymapper, from config.
+    - r4405: Smarter clearing of the dynrec cache.
+0.83.11
+  - Added support for the clipboard device (CLIP$) and
+    DOS clipboard API on non-Windows systems (they were
+    previously only supported on the Windows platform).
+    In Linux SDL1 build only read access is supported
+    whereas both read and write access are supported in
+    all other builds. Also, selecting and copying text
+    to the host clipboard using a mouse button or arrow
+    key is now supported in macOS SDL1 build. (Wengier)
+  - Added "Paste Clipboard" button to the AUTOEXEC.BAT,
+    CONFIG.SYS and 4DOS.INI sections in Configuration
+    Tool for pasting clipboard contents. (Wengier)
+  - Windows SDL2 builds now use same clipboard pasting
+    method as Windows SDL1 builds by default instead of
+    the BIOS keyboard function. The method is now also
+    available for Linux and macOS (both SDL1 and SDL2)
+    builds (although it is disabled by default on these
+    platforms). A menu option "Use BIOS function for
+    keyboard pasting" is added to the "Shared clipboard
+    functions" menu group (under "Main") to use BIOS
+    function for the clipboard pasting instead of the
+    keystroke method. Make sure this option is disabled
+    if pasting clipboad text into Windows 3.x/9x apps
+    (e.g. Notepad & Write) is desired. This setting can
+    be changed with "clip_paste_bios" config option in
+    in [sdl] section of the config file too. (Wengier)
+  - With the config option "startcmd=true" or command-
+    line option -winrun, Windows applications can now
+    be launched from within a DOS program or from the
+    4DOS shell in addition to built-in shell. (Wengier)
+  - Added the "disable graphical splash" config option
+    in [dosbox] section which when set will cause a
+    text-mode BIOS splash screen to be always displayed
+    at startup instead of the graphical one. If the
+    TrueType font (TTF) output is enabled the text-
+    mode BIOS screen is used automatically. (Wengier)
+  - Added a simple BIOS Setup Utlity, which will show
+    a summary of the current system configuration and
+    allow users to change the date and time. Press Del
+    key at the BIOS boot screen to enter. (Wengier)
+  - Added config option "showbasic" in [sdl] section
+    which when set to false will hide DOSBox-X version
+    number and running speed in the titlebar. (Wengier)
+  - Added experimental option to load a VGA BIOS ROM
+    image and execute it, instead of our own INT 10h
+    emulation. If enabled, it will load the specific
+    ROM file into C000:0000. If not specified, it
+    will choose based on machine type. VGA BIOS ROM
+    images (e.g. et4000.bin for Tseng ET4000 emulation)
+    can be dumped from real hardware or downloaded from
+    the PCem ROMs collection. It can be set with config
+    option "vga bios rom image" in [video] section.
+  - Improved handling for file- and record-locking
+    for non-Windows platforms. Portions of the code
+    are adopted from DOSEmu. (Wengier)
+  - Improved handling for the setting "ansi.sys=false",
+    such as fixing the welcome screen messup in this
+    case and allowing the use of a custom ANSI TSR
+    (such as NNANSI.COM) instead. (Wengier & stu)
+  - You can now press Ctrl+C or Ctrl+Break to break
+    from long outputs from commands like TYPE, MORE,
+    COPY, DIR /S, and ATTRIB /S. (Wengier)
+  - Renamed MEM.COM to MEM.EXE to match DOS. (Wengier)
+  - Rewrote built-in TREE command instead of the one
+    from FreeDOS to support long filenames. (Wengier)
+  - DELTREE is now an external command appearing on
+    drive Z: as DELTREE.EXE instead of a builtin shell
+    command, since it is an external command in a real
+    DOS system. (Wengier)
+  - Added REPLACE command to replace files, resembling
+    the MS-DOS counterpart. This command is compiled
+    with long filename support. (Wengier)
+  - Added PUSHD and POPD commands so that you can store
+    the current directory and changes to the specified
+    directory (optionally also the current drive), then
+    changes the directory/drive back. PUSHD command
+    without arguments show stored path(s). (Wengier)
+  - Added COLOR command to change current foreground
+    and background colors. It usage is similar to the
+    same-named command in the Windows command prompt.
+    For example, command "COLOR fc" produces light red
+    on bright white; COLOR without an argument restores
+    the original color. (Wengier)
+  - Added CHCP command to view the current code page,
+    or change the current code page for the TrueType
+    font (TTF) output. Supported code pages include:
+    437, 808, 850, 852, 853, 855, 857, 858, 860, 861,
+    862, 863, 864, 865, 866, 869, 872, and 874. You can
+    now also set the code page for TTF output via the
+    optional second parameter of the "country" option
+    in [config] section of the configuration. (Wengier)
+  - Added function to automatically save states in the
+    specified time interval (in seconds). You can also
+    specify a save slot or start and end save slots to
+    be used. For example, "autosave=10 11-20" will set
+    a 10-second time interval for auto-saving, and the
+    save slots used will be between 11 and 20. If no
+    save slot is specified, then the current save slot
+    will be used for auto-saving. Putting a minus sign
+    before time interval causes the auto-saving function
+    to not be activated at start. You can optionally
+    also specify up to 9 program names for this feature,
+    e.g. "autosave=10 11-20 EDIT:21-30 EDITOR:35" will
+    cause program "EDIT" to use save slots 21-30, and
+    "EDITOR" to use save slot 35, and other programs to
+    use save slots 11-20. Added a menu option "Auto-save
+    settings..." to manage the auto-saving feature at
+    run-time. A menu option "Enable auto-saving state"
+    is added to the "Save/load options" menu group under
+    "Capture" to toggle auto-saving when the function is
+    enabled. Likewise, a menu option "Select last auto-
+    saved slot" is added to the "Select save slot" menu
+    group (also under "Capture") to switch to the last
+    auto-saved slot (if any). (Wengier)
+  - The Configuration Tool windows are now scalable, so
+    that they will no longer look very small in e.g.
+    full-screen or High DPI modes. (ant_222)
+  - If the -defaultdir option is the only or the last
+    command-line option and no parameter is specified,
+    then directory of the primary config file (if any)
+    becomes the DOSBox-X default directory. (Wengier)
+  - You can now change the current output dynamically
+    with CONFIG command, e.g. "CONFIG -set output=ttf"
+    and "CONFIG -set output=default". (Wengier)
+  - The command "KEYB US" will return the DOS codepage
+    to 437 if current codepage is different. (Wengier)
+  - The setting "output=default" will enable the OpenGL
+    output for Linux systems if possible. (Wengier)
+  - Fixed the CGA/MCGA/MDA/Hercules-specfic shortcut
+    function buttons in Mapper Editor, and the screen
+    colors after exiting from Mapper Editor when using
+    these machine types in Direct3D output (SDL1 build).
+    Also fixed the messages in the welcome banner for
+    these machine types to inform users the new default
+    shortcuts (Ctrl(+Shift)+[F7/F8]). (Wengier)
+  - Fixed DOS Int21/AH=0x5a "Create temporary file"
+    function not generating unique files. (Wengier)
+  - Fixed that the current drive goes back to Z drive
+    when combined unmounts & mounts are used. (Wengier)
+  - Fixed PC-98 keyboard handling of CTRL+A through
+    CTRL+Z. CTRL+C now works correctly in PC-98 mode.
+  - Fixed crash of Free Pascal compiler with dynamic
+    core and setting "use dynamic core with paging on =
+    auto" introduced in the previous version. (Wengier)
+  - Fixed launching Windows programs when the working
+    directory has no 8.3 filename entry. (Wengier)
+  - Fixed issues with full-screen switch in some cases
+    when the TrueType font output is enabled. (Wengier)
+  - Fixed an issue in MinGW builds that no data will be
+    sent to the OPL3Duo board. (DhrBaksteen)
+  - Fixed screen flickering when hovering over the menu
+    with Direct3D output in the Windows SDL2 build that
+    was introduced in the last version. (Wengier)
+  - Fixed mounting disk/CD images with long paths from
+    the "Drive" menu may not work properly. (Wengier)
+  - Fixed that the "Save" button in Configuration Tool
+    did not save config file in last version. (Wengier)
+  - Integrated SVN commits (Allofich)
+    - r4346: Fix a long-standing crash that occurred
+    when disconnecting a second joystick after
+    partially mapping it.
+    - r4344: Add F8 to toggle printable characters on
+    and off in the debugger.
+    - r4340: Fix behavior when main memory allocation
+    fails.
+    - r4336: Correct an oversight of r4186 when floppy
+    disks are mounted.
+    - r4330: some big endian improvements and drive_fat
+    fixes. (jmarsh)
+    - r4320: Report Q-Channel track number in BCD,
+    meaning it is not converted to binary by the
+    CD-ROM device driver. Fixes the CD-Player feature
+    of DOS Navigator 1.51 when playing past track 15.
+    - r4318: Add LOGC debug command to log cs:ip only.
+0.83.10
+  - The Windows key(s) in Windows and the Command key(s)
+    in macOS will now be displayed as the "Windows" and
+    "Command" keys instead of the "super" and the "meta"
+    keys in SDL1 builds just like SDL2 builds. (Wengier)
+  - Cursor blinking rate for TrueType font (TTF) output
+    can now be customized with the ttf.blinkc option.
+    Set an integer between 1 (fastest) and 7 (slowest)
+    to change TTF cursor blinking rate, or setting it to
+    0 for no cursor (or false for non-blinking cursor as
+    in previous versions), with the default value being
+    6 on PC-98 systems and 4 elsewhere. (Wengier)
+  - Fixed parallel port emulation to allow MDA port 3BCh
+    to work properly.
+  - Enhanced the printer function on Windows platforms
+    to allow printer names to be specified in [printer]
+    section via the "device" option for direct printing
+    to the selected device. If left empty, then Windows
+    Print dialog will always be shown, or specifying "-"
+    will cause it to show only once (unless the user
+    clicks "Cancel"). Under "Help" menu there is now a
+    menu option "List Printer Devices" to list printer
+    devices on Windows, and the parallel port LPT1 now
+    defaults to the printer on all platforms. (Wengier)
+  - The dynamic_x86 CPU core can now handle page faults
+    non-recursively, so you can now run the dynamic_x86
+    core with Windows 9x/ME without crashes, although
+    this may slightly decrease the performance, and it
+    may be disabled by setting the config option "use
+    dynamic core with paging on" in [cpu] section to
+    "false"; the default value of this option has been
+    changed to "auto" which will enable/disable itself
+    based on whether the 386 paging and a guest system
+    has been enabled. Also fixed incorrect behavior for
+    handling trap flags in the dynamic core and updated
+    the MMX code for improved performance. (koolkdev)
+  - Added support for Direct3D output on Windows SDL2
+    builds just like Windows SDL1 builds to become the
+    default output in all Windows builds. (Wengier)
+  - DOSBox-X now natively supports the pixel-perfect
+    scaling! Set the option "output=openglpp" in [sdl]
+    section of the config file to enable this output.
+    Alternatively, the output can be selected from the
+    menu ("Video" => "Output" => "OpenGL perfect") at
+    run-time. It is recommended to set config options
+    and "aspect=true" (whenever the emulated display
+    has an aspect ratio of 4:3) and "doublescan=false"
+    for openglpp output. Also, with high DPI displays
+    (e.g. on Windows 7+ with DPI scaling enabled) it
+    works better with full-screen mode and the setting
+    "dpi aware=true". It was implemented by ant_222
+    (patch author) with some code cleanups by Wengier.
+  - Updated the Windows installer to add a page for
+    new users to select a video system output to use -
+    the default output (Direct3D), OpenGL with pixel-
+    perfect scaling (openglpp or "OpenGL perfect") for
+    improved image quality, and the TrueType font (TTF)
+    output for text-mode DOS applications. (Wengier)
+  - You can now supply a ZIP/7Z file as a parameter to
+    DOSBox-X directly so that it will be mounted as C:
+    drive when DOSBox-X starts. (Wengier)
+  - Added overlay support for mounting PhysFS drives
+    so that you can specify a write location when you
+    mounted a ZIP/7Z archive by adopting an old patch.
+    For example, command "MOUNT C C:\DIR -T OVERLAY"
+    will specify path C:\DIR(\C_DRIVE) as the write
+    location after mounting C: drive as a PhysFS drive
+    with a command like "MOUNT FILES.ZIP". (Wengier)
+  - Added ability to resolve file paths that include
+    environment variables on Windows or tildes (~) on
+    other platforms for various options in the config
+    file, such as language and mapper file paths, MT32
+    ROM & FluidSynth soundfont paths, [config] section
+    options as well as file outputs for the printing
+    and serial/parallel port functions. (Wengier)
+  - Added calculator for DOS (EVAL.EXE), which appears
+    on Z drive and can calculate both simple (such as
+    sin(0) and cos(0)) and many advanced mathematical
+    expressions in either command-line mode and or the
+    interactive mode. (Wengier)
+  - Added support for standard (VGA/EGA/CGA) and mono
+    mode dual-screen setup by porting the patch. You
+    can now start DOSBox-X with the option -display2
+    followed by a color (white, green, amber) to enable
+    this feature on debug builds. (Wengier)
+  - You can now translate texts in DOSBox-X's drop-down
+    menus. The message files as written by the config
+    tool (CLI or GUI) will contain the menu texts for
+    translations from the English language. (Wengier)
+  - Added "file access tries" config option (in [dos]
+    section) so that if a positive integer is provided
+    (e.g. 1 or 3) DOSBox-X will try to read/write/lock
+    files on mounted local drives for the specified
+    number of times before failing on Windows builds.
+    It is especially useful for networked DOS database
+    applications that require record locking. (Wengier)
+  - Added "bannercolortheme" config option (in [dosbox]
+    section) so that users can change the background
+    color theme of the welcome banner from the default
+    blue color when DOSBox-X starts. (Wengier)
+  - Added "pcaptimeout" config option (in the [ne2000]
+    section) to specify a read timeout value for pcap
+    in milliseconds, or default value (-1 on Windows
+    or 3000 otherwise) will be used. (Wengier & Jookia)
+  - Added "Save & Restart" button to the Configuration
+    Tool's "Save" option for saving the config file and
+    then automatically restarting DOSBox-X with this
+    saved configuration. Command-line options -wcboot,
+    -wcdboot and -wcpboot are added to CONFIG command
+    which resemble -wc, -wcd, and -wcp options but will
+    reboot DOSBox-X after writing configfile. Command-
+    line option -bc (-bootconf) is also added to reboot
+    with specified config file (or the primary loaded
+    config file if not specified) directly. (Wengier)
+  - The config option ttf.font will now search for TTF
+    fonts in the directory as specified by the fontpath
+    option in [printer] section too. (Wengier)
+  - Added special properties to CONFIG command such as
+    "screenwidth", "screenheight", "windowwidth", and
+    "windowheight" so that commands like "CONFIG -GET
+    screenwidth" and "CONFIG -GET screenheight" will
+    get the current screen width and height. (Wengier)
+  - BOOT command without a parameter will now try to
+    boot the current drive if possible. (Wengier)
+  - You can now change properties such as "fullscreen",
+    "glshader" and "windowposition" dynamically with
+    CONFIG command. For example, command "config -set
+    fullscreen=true" and "config -set windowposition="
+    will now switch on the full-screen mode and center
+    the window position respectively. For TrueType font
+    output, you can now also change the TTF font, the
+    number of rows and columns on the TTF screen, and
+    the word processor for TTF dynamically using CONFIG
+    command, e.g. "config -set ttf.font=test", "config
+    -set ttf.lins=30", "config -set ttf.cols=100" and
+    "config -set ttf.wp=wp". The limits for the options
+    ttf.cols and ttf.lins are increased too. (Wengier)
+  - Implemented the DOS network redirector functions so
+    that the host name can be reported to DOS programs,
+    unless the secure mode is enabled. You may need to
+    set either the option ipx=true in [ipx] section or
+    the option ne2000=true in [ne2000] section. Also
+    added config option "network redirector" to [dos]
+    section which if set to false disables the network
+    redirector even with IPX/NE2000 enabled. (Wengier)
+  - Fixed an issue that the DOSBox-X window size may be
+    incorrect when restoring from a maximized window in
+    the SDL2 builds. (Wengier)
+  - Fixed that the menu option "Select OpenGL (GLSL)
+    shader.." not working properly sometimes. (Wengier)
+  - Fixed Ctrl+C not working in GNU ed. (Wengier)
+  - Fixed large ISO images (>2GB) unable to be mounted
+    using IMGMOUNT command. (Wengier)
+  - Fixed build failure on Gentoo Linux. (fonic)
+  - 3dfx games can now work with the Glide passthrough
+    feature when a guest system (guest DOS or Windows
+    9x) is currently running. The default setting for
+    config option "keep private area on boot" in [dos]
+    section is changed from "false" to "auto". (Wengier)
+  - Improved the speed of the Voodoo hardware emulation
+    for running games like Tomb Raider 3dfx. (Wengier)
+  - Improved OPL3Duo support, such as adding a buffer
+    thread to get rid of slowdowns & breakups in audio
+    playback when using the board. (DhrBaksteen)
+  - Updated the Tiny File Dialog library to the latest
+    version v3.8.5, which fixes issues such as the
+    compatibility problem with Windows XP. (Wengier)
+  - Updated FLAC, MP3, and WAV CD-DA decoder libraries
+    to the latest versions (0.12.28, 0.6.26 and 0.12.18
+    respectively; per David Reid). (Wengier)
+  - Integrated SVN commits (Allofich & Wengier)
+    - r4426: Emulate debug register 6 during trap flag
+    emulation (and normal int 1). Fixes 544 (jmarsh)
+    - r4401: Improve xchg to handle unwritable memory
+    better for core_dyn_x86.
+    - r4399: Finish up and add LOOP_NE and LOOP_E for
+    core_dyn_x86.
+    - r4393: Remove video page check when drawing
+    internal mouse pointer, as the BIOS current page
+    is not updated in some cases. Fixes QQP games: Lost
+    Admiral, Conquered Kingdoms, and Solitaire's
+    Journey. Also be a bit smarter about enabling
+    autolock, supporting more cases where the mouse
+    is used for input without resetting it.
+    - r4392: Improve capturing of Zeliard and fix a
+    few percussion-related capturing problems as well.
+    - r4310: Improve PMAKE on big endian machines and
+    fix some bugs. Fixes bug in 16 -> 15 bit color
+    conversion.
+    - r4309: Copy working directory when mounting an
+    overlay.
+    - r4307: Refinement of SoundBlaster checks, so no
+    IRQ is raised when not in autodma mode.
+
+0.83.9
+  - Physical CD drives are now mountable in SDL2 builds
+    just like SDL1 builds, so commands like "MOUNT -CD"
+    should work in both SDL1 and SDL2 builds. Some code
+    is adopted from the SDL2_CDROM library. (Wengier)
+  - Implemented file locking support for mounting disk
+    image files so that you cannot mount the same disk
+    image files in read/write mode at the same time as
+    this can cause possible disk corruptions. A config
+    option "locking disk image mount" is added to the
+    [dosbox] section which when set to false (or if the
+    user mounts the image files read-only) will bypass
+    the locking of image files. Also improved the DOS
+    file locking function, which can be disabled by
+    setting "share=false" in [dos] section. (Wengier)
+  - Implemented PhysFS support so that you can mount
+    archives (e.g. ZIP/7Z) as drives in read-only mode,
+    e.g. "MOUNT C TEST.ZIP" or "MOUNT D FILES.7Z". Some
+    code is ported from a custom DOSBox fork. The menu
+    option "Mount an archive file (ZIP/7Z)" is added to
+    Drive menu to mount archives as Drives. (Wengier)
+  - INT 13h now obeys the "hard drive data rate limit"
+    setting, using the same disk I/O delay code as
+    INT 21h file I/O. [Issue #2039]
+  - Linux/X11 SDL1 builds: Combine window move/resize
+    into one call if possible, and not during window
+    manager hints, to avoid resize problems with the
+    XFCE 4.14 platform.
+  - Added menu option "Create blank disk images..."
+    (under "DOS" menu) to create blank floppy or hard
+    disk images of a common disk size, including 360KB,
+    400KB, 720KB, 1.2MB, 1.44MB and 2.88MB for floppy
+    disk images and 250MB, 520MB, 1GB, 2GB, 4GB and 8GB
+    for hard disk images. The 1GB option (-t hd_1gig)
+    is also added to IMGMAKE command. (Wengier)
+  - The Configuration Tool will now be centered within
+    the DOSBox-X window for a better looking. (Wengier)
+  - Added config option "synchronize time" in [dosbox]
+    section which when set to true will allow DOSBox-X
+    to automatically synchronize the date and time with
+    the host system, unless you manually change date
+    and/or time. A menu option "Synchronize host date/
+    time" is added to the DOS menu. The function uses
+    IRQ0 handler; it will not work in PC-98 mode nor if
+    the timer isn't running at the standard 18.2Hz tick
+    rate, as any other rate does not make sense and
+    will cause only jitter and error. Also fixed two
+    Demoscene entries sl_fokus and sl_haloo which use
+    BIOS_TIMER with a faster hardware tick rate.
+  - Added config option "showdetails" which when set to
+    true enables the menu option "Show FPS and RT speed
+    in title bar" at start. It is equivalent to -showrt
+    and -showcycles command-line options. (Wengier)
+  - Improved compatibility with Watcom C++ 2.0 when
+    long filename (LFN) support is enabled. (Wengier)
+  - Added support for starting DOSBox-X in a specific
+    display on a multi-screen setup (Windows builds as
+    well as Linux/macOS SDL2 builds). A config option
+    "display" is added to the [sdl] section that users
+    can specify a display for the DOSBox-X window to
+    start. The option can be combined with the existing
+    "windowposition" config option to specify the
+    position on the specified display/screen. (Wengier)
+  - DOSBox-X will now pop up a message box to inform
+    the user when a Direct3D pixel shader is loaded
+    from the menu on the Windows platform. (Wengier)
+  - Extended serial (COM) ports from COM1-COM3 to COM1-
+    COM9 in the [serial] section. The config options
+    serial4-9 are advanced options. You can optionally
+    specify base addresses for any serial ports. When
+    the "file" option is used, you can additionally
+    specify a program to open the file with "openwith"
+    option. If the specified program cannot be executed
+    due to some problem, DOSBox-X will try to start a
+    program as specified with the "openerror" action,
+    or it will show an error. For both serial (COM) and
+    parallel (LPT) ports options, the program commands
+    can be quoted with double quotes, or with single
+    quotes if the "squote" option is added. (Wengier)
+  - Extended parallel (LPT) ports from LPT1-LPT3 to
+    LPT1-LPT9 in the [parallel] section. Config options
+    lpt4-9 are advanced config options. You can also
+    optionally specify base addresses and IRQs for
+    these ports. The parallel1-9 config options are
+    enhanced to allow the generated files to be started
+    with the specified action: "openpcl" to start a
+    program to open the file if the print output is
+    detected to be PCL; "openps" to start a program if
+    the print output is detected to be PostScript (PS);
+    "openwith" to start a program otherwise. If you'd
+    like to specify parameters then be sure to properly
+    quote the string(s). Furthermore, if any of the
+    specified program(s) cannot be executed, DOSBox-X
+    will try to start a program as specified with the
+    "openerror" action, or show an error. (Wengier)
+  - Added "openwith" and "openerror" config options to
+    [printer] section to start the specified program to
+    open the printer output file. The [printer] section
+    also accepts "fontdir" option where you can change
+    the path ("FONTS" by default) where the printer TTF
+    fonts (including courier.ttf, ocra.ttf, roman.ttf,
+    sansserif.ttf, script.ttf) are located. If no TTF
+    font can be found (either from the custom path or
+    system path) for printing, the internal TTF font
+    for the TTF output will be used. (Wengier)
+  - Added read-only options to the Drive menu to mount
+    host folders/drives or image files to the specified
+    drive letter in read-only mode. (Wengier)
+  - You can now use a single mapper file for both SDL1
+    and SDL2 versions of DOSBox-X! The new mapper file
+    will be divided to sections [SDL1] and [SDL2] for
+    both versions. The mapper file can be specified
+    with the mapperfile config option, or you can set
+    the mapperfile_sdl1 and mapperfile_sdl2 config
+    options to override mapperfile option. (Wengier)
+  - Added -defaultmapper command-line option which will
+    use default key bindings for the mapper. (Wengier)
+  - The menu functions "Load mapper file", "Quick edit
+    mode", "Stop clipboard pasting" and "Display state
+    information" have been added to the key mapper so
+    that you can now define your own shortcut keys to
+    activate these functions. (Wengier)
+  - The default shortcuts for the "Copy to clipboard",
+    "Paste from clipboard", and the "Reset window size"
+    functions are now Ctrl+F5, Ctrl+F6 and Host(F11/F12)
+    +BackSpace respectively. (Wengier)
+  - Added ttf.fontbold, ttf.fontital, and ttf.fontboit
+    config options so that you can specify actual bold
+    italic, and bold-italic TrueType fonts for use with
+    the TTF output that will render the bold, italic,
+    and bold-italic text styles using the actual TTF
+    fonts (e.g. consolab, consolai, consolaz instead of
+    consola) instead of making the original TTF font
+    bold, italic, bold-italic automatically. (Wengier)
+  - DOSBox-X now supports the use of arrow keys (left,
+    right, up, down, home, end) to select and copy text
+    to the host clipboard in addition to a mouse button
+    (subject to the specified key modifier, or use the
+    QuickEdit function). The arrow keys will move the
+    selections; press Home key to start the actual text
+    selection and End key to end text selection and to
+    copy to the clipboard; press ESC key to cancel text
+    selection. Set config option "clip_mouse_button" to
+    "arrows" to enable it, or select it from "Shared
+    clipboard functions" menu group. (Wengier)
+  - You can now press the key combination Ctrl+Tab in
+    the shell to see a list of files/directories that
+    can be completed by the Tab completion. (Wengier)
+  - Added SETCOLOR command to view or change the text-
+    mode color scheme settings. Also fixed the color
+    palette for the TTF output. (Wengier)
+  - Separated "TTF options" menu group that contains
+    TrueType font (TTF) related menu options from the
+    "Text-mode" menu group in "Video" menu. (Wengier)
+  - The "Show menu bar" option now appears in system
+    menu of the Windows SDL2 build too. (Wengier)
+  - If a language file fails to load, DOSBox-X will now
+    show a warning dialog instead of exiting. (Wengier)
+  - The option "clip_key_modifier" now accepts values
+    like "ctrlalt", "ctrlshift", "altshift". (Wengier)
+  - Fixed 2D texture not showing for 3dfx games in the
+    Glide passthrough mode. (Wengier)
+  - Fixed the mouse sensitivity menu option (under the
+    "DOS" menu) not working. (Wengier)
+  - Fixed the color palette problem when switching to
+    graphic mode from mono mode. (Wengier)
+  - Fixed full-screen TTF output may not fully cover
+    the background screen in Linux. (Wengier)
+  - Fixed that lines starting with "%" in [autoexec]
+    section are being ignored. (Wengier)
+  - Fixed issues with building the code with original
+    MinGW using the ./build-mingw script. (Wengier)
+  - Fixed option "output=ttf" not working properly with
+    -startui/startmapper command-line option. (Wengier)
+  - When the mouse is captured, the title bar will show
+    the shortcut to release the mouse. (Wengier)
+  - IMGMOUNT now assumes the ISO type for .GOG/.INS
+    files (which are equivalent to .CUE/.INS files)
+    if no type is specified by the user. (Wengier)
+  - Improved the dynamic core including the way its
+    cache is allocated and to support dual mapping.
+  - The FREECG98.BMP file (for PC-98 mode) is now
+    rendered based on a unifont_jp TTF font instead
+    of UnifontFullMediumMono.ttf. (roytam1)
+  - Added support for automatic switching from TTF
+    output to another output in PC-98 mode, allowing
+    Windows 3.1 to run in this mode. (Wengier)
+  - Added OPL3Duo support, which passes OPL3 output
+    to an OPL3Duo Arduino board with a specific
+    configuration if desired. Set the config option
+    "oplemu=opl3duoboard" to use it. (josephillips85)
+0.83.8
+  - Added support for scalable TrueType font (TTF)
+    output for text-mode programs. Set "output=ttf"
+    and optionally a monospaced TTF font (such as
+    consola) with config option "ttf.font" to use it.
+    Lines and columns can be specified with config
+    options "ttf.lins" and "ttf.cols", and the cursor
+    can be made blinking with the option "ttf.blinkc".
+    The config options "ttf.ptsize" and "ttf.winperc"
+    can be used to set the TTF font size and window
+    percentage respectively. If you specify a TTF font
+    size with "ttf.ptsize" then "ttf.winperc" will be
+    ignored. You can also specify a word processor
+    (WP=WordPerfect, WS=WordStar, XY=XyWrite) for the
+    on-screen text-style and 512-character font (WP)
+    features. When using the TTF output DOSBox-X will
+    temporarily switch to a different output when a
+    graphical mode is requested (or when trying to take
+    a screenshot); the TTF output will be auto-switched
+    back later), which can be customized via config
+    option "ttf.outputswitch" (which defaults to auto).
+    Menu items in the "Text-mode" menu group (under
+    "Video" menu) have been expanded to support TTF
+    options such as increasing/decreasing the TTF font
+    sizes and on-screen text style toggling (including
+    bold, italics, underline and strikeout). You can
+    also select a TTF font to use at run-time with the
+    "Select TrueType font (TTF)" menu option. (Wengier)
+  - Added the "Load mapper file..." menu option (under
+    "Main") to select and load a DOSBox-X mapper file
+    at run-time. Be sure to select a SDL1 mapper file
+    for SDL1 builds, and similar for SDL2. (Wengier)
+  - You can now select a host key from the menu (under
+    "Main") including Ctrl+Alt, Ctrl+Shift, Alt+Shift,
+    or use the mapper-defined host key as in previous
+    versions (which default to F11 on Windows and F12
+    otherwise). A config option "hostkey" is added so
+    that you can specify it from config file. (Wengier)
+  - Pasting text from the clipboard on macOS SDL1 build
+    is now supported like Linux SDL1 build. (Wengier)
+  - Added support for ARM-based Apple M1 MacBook. The
+    dynamic core now works on ARM-based macOS systems.
+    SDL1 builds updated to use newer audio APIs on the
+    macOS platform so that the audio works once again
+    when compiled and run on macOS 11 (Big Sur). Prior
+    to the change, ancient versions of the API dating
+    back to the mid 2000s were used which no longer
+    work on Big Sur.
+  - DOSBox-X will now look for the config file (i.e.
+    dosbox-x.conf/dosbox.conf) and the mapper file in
+    the directory containing the DOSBox-X executable
+    too if the config or mapper file cannot be found
+    in the DOSBox-X working directory. (Wengier)
+  - The system menu in Windows SDL1 builds is now also
+    available for Windows SDL2 builds, and menu items
+    "Reset font size", "Increase TTF font size" and
+    "Decrease TTF font size" are added. (Wengier)
+  - Enhanced the mapper editor interface to allow more
+    keyboard shortcuts to be added, shown in multiple
+    pages in the mapper, navigable with the "Previous
+    Page" and "Next Page" buttons. The text in the
+    grids are now longer and clearer too. The default
+    shortcuts for a few items are changed to use the
+    Host key style (e.g. Host+S and Host+L for saving
+    and loading states respectively). (Wengier)
+  - Added menu item "List network interfaces" under
+    "Help" menu to list network interfaces in the host
+    system for the NE2000 feature. (Wengier)
+  - Added menu group "DOS commands" under "Help" menu
+    to display the help content for the selected DOS
+    shell command (DIR, CD, etc). (Wengier)
+  - Configuration Tool now provides the option to save
+    to the primary or user config files. (Wengier)
+  - Certain config options (e.g. doublescan) that were
+    marked as advanced options are now general config
+    options and will appear in dosbox-x.reference.conf
+    apart from dosbox-x.reference.full.conf. (Wengier)
+  - Added config options "saveremark" (default: true)
+    and "forceloadstate" (default: false) in [dosbox]
+    section which can be used to control if DOSBox-X
+    should ask users to enter remarks when saving a
+    state or show warnings when loading a saved state
+    if there is a mismatch found. (Wengier)
+  - The config option "pixelshader" is moved from the
+    section [gui] to [render] so that it will be in the
+    same section as the option "glshader". (Wengier)
+  - Added menu item "Select OpenGL (GLSL) shader..." to
+    allow OpenGL shader switch from the menu, just like
+    the function for Direct3D pixel shaders. (Wengier)
+  - Added menu item "Show IDE disk or CD status" under
+    "DOS" menu to show the current assignments (disk or
+    CD image) of the IDE controllers. (Wengier)
+  - Fixed IDE CD assignment may not be reset when soft
+    reboots are activated from guest systems. (Wengier)
+  - The program 80x43.COM is added into the ZIP package
+    TEXTUTIL.ZIP on the Z drive. You can also change
+    current text screen to the 80x43 mode from the menu
+    group "Text-mode" under "Video" menu. (Wengier)
+  - Enhanced MODE command so that you can change the
+    number of columns and lines in the screen with the
+    syntax "MODE CON COLS=c LINES=n" (c=80 or 132, and
+    n=25, 43, 50, or 60). The command "MODE CON" will
+    show the current number of columns and lines in the
+    screen as in a real DOS system. (Wengier)
+  - Added FLAGSAVE command for the save state feature
+    to flag (mark) one or more files to be saved and
+    loaded. Type "FLAGSAVE /?" for more information on
+    this command. (PogoMan361 and Wengier)
+  - Enhanced A20GATE command to show the current status
+    of the A20 gate when no parameter is given, along
+    with other small improvements. (Wengier)
+  - INT 21h DOS=HMA emulation, to enable the A20 gate,
+    and autoa20fix, to disable the A20 gate, now checks
+    whether the CPU is running in virtual 8086 mode.
+    If vm86 detected, the code will control the A20
+    gate by calling the XMS interface instead of direct
+    reading/writing via port 92h. This consideration
+    is required for autoa20fix to cooperate with
+    Microsoft Windows 3.1. Note that Windows 3.1 does
+    not virtualize port 92h. If it did, this workaround
+    would not be necessary.
+  - Added -a option to LOADFIX command which will auto
+    allocate enough memory to fill lowest 64KB memory
+    instead of using exactly 64KB memory. (Wengier)
+  - Added autofixwarning option (true by default) which
+    allows user to silence the messages when DOSBox-X
+    tries to auto-fix "Packed file is corrupt" error
+    when running a program with this issue. (Wengier)
+  - Added autoa20fix option (enabled by default). This
+    option when enabled attempts to resolve EXEPACK
+    "Packed file is corrupt" errors by temporarily
+    disabling the A20 gate and running the program
+    again. This may provide better support for affected
+    DOS applications than the LOADFIX option. If both
+    autoa20fix and autoloadfix are set, then autoa20fix
+    will be tried first, and if it did not work then
+    autoloadfix will be tried next.
+  - The autoloadfix config option changed to allocate
+    only enough memory to keep the executable above the
+    64KB boundary, instead of blindly allocating 64KB.
+  - Fixed menu items "Rescan drive" and "Swap disk" in
+    "Drive" menu being reversed. (Wengier)
+  - Fixed CD audio issue with the game "The Secret of
+    Monkey Island" when talking to the pirate in Scumm
+    Bar by adapting the patch that fixes it. Thanks
+    kcgen for the fix logic. (Wengier)
+  - Added support for MAME CHD CD images. You can now
+    mount CHD images with IMGMOUNT command, or from the
+    Drive menu. Based on libchdr library and the work
+    of the user whocares010. (Wengier)
+  - Updated FLAC/MP3/WAV CD-DA decoder libraries to the
+    latest versions (versions 0.12.22, 0.6.19, 0.12.14
+    respectively). Thanks to mackron & kcgen. (Wengier)
+0.83.7
+  - The primary DOSBox-X Wiki is now located at the
+    URL: https://dosbox-x.com/wiki (Wengier)
+  - Implemented the x86 dynamic core for both 32-bit
+    and 64-bit systems by re-porting the code from SVN.
+    Dynamic core now supports either the dynamic_x86
+    or the dynamic_rec core. The dynamic_x86 core will
+    be used by default for x86 and x86_64 platforms and
+    if "core=dynamic" is set, and Windows 9x can be run
+    in this dynamic core (although at this time may
+    encounter some issue with the S3 driver). You can
+    also explicit specify setting "core=dynamic_x86" or
+    "core=dynamic_rec" for either the dynamic_x86 core
+    or the dynamic_rec core. Also thank joncampbell123
+    for the 64-bit fix. (Wengier)
+  - You can now use your own save file (in addition to
+    save slots! There are now a "Use save file" toggle
+    item and "Browse save file..." for browsing save
+    files on your computer. A config option "savefile"
+    (in [dosbox] section) is added to specify a save
+    file to use at start. (Wengier)
+  - Save state feature now allows users to optionally
+    enter remarks when saving a state. A submenu group
+    "Save/load option" is added (under "Capture") where
+    you can toggle menu items "No remark when saving
+    state" (for disabling input of remarks when saving)
+    and "force load state mode". A menu item "Display
+    state information" is added as well to display the
+    information of the saved state. (Wengier)
+  - DOSBox-X will now use native dialog box to display
+    quit warnings and save state errors. (Wengier)
+  - Changed some DOS error messages (such as "Illegal
+    command" which now reads "Bad command or filename")
+    similar to real DOS systems. (Wengier)
+  - ADDKEY and INT2FDBG commands now appear as programs
+    on Z: drive instead of shell commands. (Wengier)
+  - Improved the -z (move virtual drive Z:) function of
+    MOUNT command. You can move the virtual drive as
+    many times as you want, and save/load states will
+    work even after you move the Z: drive. (Wengier)
+  - Enhanced the config option "freesizecap" to allow
+    the setting "fixed" which is the same as "false",
+    and a new setting "relative" is added, which will
+    be similar to the setting "fixed" but the reported
+    free disk size will also change relative to the
+    change of the free disk size ever since. (Wengier)
+  - Added support for Opus CD-DA tracks by porting and
+    cleaning up the source code from other projects.
+    Many thanks to Marty Shepard and kcgen. (Wengier)
+  - Support for FluidSynth MIDI Synthesizer is now
+    included in the MinGW builds by default just like
+    Visual Studio builds. Set "mididevice=fluidsynth"
+    and a soundfont file to use it. (Wengier)
+  - Enabled xBRZ scaler for Visual Studio SDL2 builds
+    just like Visual Studio SDL1 builds. (Wengier)
+  - Added menu item "Show Sound Blaster configuration"
+    under "Sound" menu to show the current information
+    about Sound Blaster, and also menu item "Show MIDI
+    device configuration" (also under "Sound" menu)
+    to show information about the current MIDI device
+    such as the soundfont file in use. (Wengier)
+  - Added "Mount multiple disk/CD images" option to the
+    mounting options of the Drive menu to allow users
+    to mount more than one disk/CD images to a drive,
+    swappable from the menu. Also added separators to
+    the Drive submenu to make it look better. (Wengier)
+  - Added new CPU types to the "Emulate CPU speed" menu
+    group namely 286-25MHz, 386DX-25MHz, 486DX4-100MHz,
+    486DX5-133MHz, Pentium-60MHz, Pentium-75MHz, and
+    Pentium-90MHz. Thanks again for the data provided
+    by the user maximus105. (Wengier)
+  - You can now select a special key (e.g. Alt+Tab,
+    Ctrl+Break, Ctrl+Alt+Del, etc) to be sent from the
+    key defined in the mapper editor. The key can be
+    selected (Ctrl+Alt+Del by default) from the "Send
+    special key" menu group in "Main" menu. (Wengier)
+  - Added full Ctrl+Break emulation at the BIOS and
+    DOS level, updated console emulation to match.
+    The "Pause" mapper shortcut is now moved to
+    HOST[F11/F12]+Pause instead of Ctrl+Pause so that
+    Ctrl+Break can work properly for users, and the
+    function to send the Ctrl+Break key from the menu
+    ("Send special key" under "Main") is added. Also,
+    the PC-98 STOP key now functions the same as the
+    Ctrl+C and Ctrl+Break keys in IBM PC mode.
+  - Added functions "CopyToClipboard" and "QuickRun" to
+    the mapper editor so that you can use shortcuts to
+    activate them (default shortcuts: HOST(F11/F12)+A
+    and HOST(F11/F12)+Q respectively), and a default
+    shortcut HOST(F11/F12)+V is added to the clipboard
+    paste function. Meanwhile, FullCore and SimpleCore
+    shortcuts are removed from the mapper. (Wengier)
+  - Added two new menu items in the "Shared clipboard
+    functions" menu group under "Main", including "Copy
+    all text on the DOS screen" which will copy all
+    screen text to the clipboard, and "Stop clipboard
+    pasting" which allows user to stop pasting in the
+    middle of pasting long clipboard content. (Wengier)
+  - The mouse copy/paste feature is now available for
+    non-Windows systems on SDL2 builds. Also, pasting
+    from the clipboard with a mapped shortcut is also
+    available for Linux/X11 on SDL1 builds. (Wengier)
+  - Added "Use US keyboard layout" toggle menu item in
+    the "PC-98" menu group under "Video" to select
+    whether to force the default US keyboard layout in
+    PC-98 mode, same as the "pc-98 force ibm keyboard
+    layout" config option in [pc98] section. Also moved
+    the "PC-98 PIT master clock" options from the "DOS"
+    menu to this menu group. (Wengier)
+  - The full dosbox-x.reference.conf file is renamed to
+    dosbox-x.reference.full.conf. The original file
+    dosbox-x.reference.conf now contains common config
+    options instead of all config options. (Wengier)
+  - The CONFIG command and Configuration Tool will now
+    save common and modified config options by default.
+    The -all command-line option (or "Save all options
+    to the configuration file" checkbox) will force to
+    save all config options. A new -mod command-line
+    option is added to CONFIG command to save modified
+    config options only, and a new -norem command-line
+    option is added to not write remarks. (Wengier)
+  - Updated the Windows installer to default to the
+    "typical" installation. For the full installation
+    start menu items will be added for DOSBox-X builds
+    copied to subdirectories. A new checkbox "Write
+    common config options (instead of all) to the
+    configuration file" is added which when checked
+    will only write common and modified advanced config
+    options to the config file. Furthermore, for both
+    "typical" and "full" installations the Windows
+    installer will now also copies the DLL files
+    inpout32.dll (32-bit) and inpoutx64.dll (64-bit) to
+    the DOSBox-X install directory for use with the
+    direct parallel port passthrough feature. (Wengier)
+  - Improved Flatpak support for Linux. (rderooy)
+  - Improved message for the -help command-line option,
+    adding for example -silent and -socket command-line
+    options in the help messages. (Wengier)
+  - Added -silent command-line option to run DOSBox-X
+    silently (without showing the DOSBox-X window) and
+    then exit after executing AUTOEXEC.BAT. (Wengier)
+  - Fixed command-line option -socket not working for
+    the null-modem feature. (Wengier)
+  - Fixed issue that aspect ratio not being respected
+    in full-screen mode when a GLSL shader is enabled
+    with an OpenGL output. (Wengier)
+  - Fixed toggle in the "Frameskip" menu group did not
+    change when selecting a different option. (Wengier)
+  - Fixed shelling from programs may not work when the
+    shell config option is set. (Wengier)
+  - The default country setting ("country" option in
+    [config] section]) now defaults to auto-detection
+    if possible, or 81 (Japan) in PC-98 mode. (Wengier)
+  - Increased the default maximum DOS files (adjustable
+    from [config] section) from 127 to 200. (Wengier)
+  - Improved resetting with LOADLIN program. (Wengier)
+  - Improved Gravis Ultrasound (GUS) implementation to
+    make it more accurately represent the GUS DMA state
+    as expected by the running DOS software.
+  - The archive attribute will no longer automatically
+    be applied to directories on non-Windows systems.
+    This fixed issue with PLAYMIDI.EXE from Gravis
+    Ultrasound when listing directories. (Wengier)
+  - Applied hack to allow the low DMA channel detection
+    in the SB16 DIAGNOSE program to work. (Wengier)
+  - The default setting of the clip_paste_speed option
+    has been changed from 20 to 30, which will help
+    prevent lost keystrokes when pasting from the host
+    clipboard for some programs. (Wengier)
+  - With Pentium CPU setting (cputype=pentium) DOSBox-X
+    no longer reports FDIV bug by default. An advanced
+    config option "report fdiv bug" is added to report
+    such CPU bug when set to true. (rderooy & Wengier)
+  - Added support for the XDG_DATA_HOME environment
+    variable for config directory in Linux. (rderooy)
+  - Added support for compiling with pcap for Windows
+    MinGW builds. (Jookia)
+  - Added config option "windowposition" (in [sdl]
+    section) to set the window position at startup in
+    the positionX,positionY format. (tomba4)
+  - Added config option "raw_mouse_input" (in [sdl]
+    section; SDL2 builds only) to bypass the operating
+    system's mouse acceleration & sensitivity settings.
+    Implemented by NicknineTheEagle.
+  - Added config option "startquiet" (in [dos] section)
+    which when set to true will silence the information
+    messages before launching Windows programs to run
+    on the Windows host. A toggle menu item "Quiet mode
+    (no start messages)" is added to the "Windows host
+    applications" menu group in "DOS" menu. (Wengier)
+  - The menu "Show details" (under "Main") is renamed
+    to "Show FPS and RT speed in title bar". (Wengier)
+  - Add menu group "Text-mode" under "Video" menu to
+    change some text-mode related video settings, such
+    as changing the number of rows and columns. A zip
+    package named TEXTUTIL.ZIP is added to the Z drive
+    that contains various utilities (such as CGA.COM,
+    EGA.COM, 132X25.COM, 132X43.COM) to change current
+    video setting from the command line. Also added a
+    config option "high intensity blinking" which when
+    set will display high intensity background colors
+    instad of blinking foreground text. The menu item
+    "Allow 9-pixel wide fonts" is moved from the menu
+    group "Compatibility" to here. (Wengier)
+  - Added "Debugging" menu group under "Help" menu, and
+    moved items from the "Video" Debug and "DOS" Debug
+    menus and the debugger here (debug builds only).
+    Also allowed to hide/show the console or debugger
+    window in Windows debug builds. With the menu item
+    "Console wait on error" checked the Windows console
+    window will wait for the ENTER key before closing
+    itself after an E_EXIT occurs. (Wengier)
+  - Updated MPXPLAY to latest version 1.65. (Wengier)
+  - Integrated SVN commits (Allofich)
+    - r4386: Correct MPU-401 clock-to-host function to
+    operate independently of playing. Fixes hang at
+    exit when playing Roland music in demos by The
+    Phoney Coders. Clamp tempo to valid range.
+    - r4384: ICW1 on the PIC clears the Interrupt Mask
+    Register. Fixes Antagony and quite a few demos that
+    expect IRQs to be unmasked.
+    - r4382: Refine adlib timers a bit more and make
+    reading the Adlib take a bit more time.
+    - r4378: Prevent some possible deadlocks with sti
+    in dynrec core.
+    - r4375: Improve compatibility with older Intel
+    chipsets
+    - r4374: Add a bit of hack so cycles=max/auto 90%
+    keeps on working inside batch files after r3925.
+    - r4371: Fix regression in Clue: Master Detective.
+    - r4370: As an adjunct to r4369, make the reference
+      counts of standard device handles equivalent to
+      those of real DOS.
+    - r4369: Compatible side-effect behavior of DOS in
+      the file close function.
+    - r4368: Improve error codes for some DOS file functions.
+    - r4367: Change FPU_FBST to only write 18 decimals
+      instead of the wrongly 19, this makes it possible
+      to switch 64 integers which in turn fixes some
+      rounding issues. (jmarsh)
+    - r4282,r4283: Switch to a different way to calculate
+      DBOPL table offsets.
+    - r4280: Prevent GenerateDMASound from running with
+      input of 0.
+    - r4279: Remove DMA_TRANSFEREND and replace with
+      DMA_MASKED.
+    - r4277: Remove cases not needed after r4276
+    - r4276: Remove defunct code related to the initial
+      display mode of the system BIOS during video mode
+      changes.
+    - r4274: fix externals.
+    - r4273: Make frameskip an integer.
+    - r4269: Use fabsf when return value is a float.
+      Small warning fix.
+    - r4265: Some more cleanups and memleak fixes.
+    - r4264: Pick some lowhanging fruit. (some memory
+      leaks and unused variables)
+    - r4262: missed one
+    - r4261: These actually use float as input.
+    - r4258: Rename bios tester to biostest and make it
+      debug only to avoid people trying to load real
+      bioses.
+    - r4257: Add simple program that allows you to boot
+      into a bios image for running cpu tester bios.
+0.83.6
+  - Improved internal Voodoo card hardware emulation,
+    such as fixing the font issue with the 3dfx version
+    of Tomb Raider when using non-Glide mode. Portions
+    of the code are ported from DOSBox ECE. (Wengier)
+  - Added OpenGL shader support by porting the feature
+    from DOSBox SVN. GLSL shaders are now supported in
+    both SDL1 and SDL2 builds, and this also allows
+    pixel-perfect scaling to be enabled for the OpenGL
+    outputs. The config option "glshader" (in [render]
+    section) can be used to specify a GLSL shader file
+    or a built-in shader when the output is set to
+    "opengl" or "openglnb". For example, you can use
+    the setting "glshader=sharp" (built-in shader) or
+    "glshader=pixel_perfect" (with GLSL shader file)
+    for the pixel-perfect scaling mode. The Windows
+    installer will also copy several GLSL shader files
+    to the "glshaders" subdirectory of the DOSBox-X
+    install directory to be used directly. (Wengier)
+  - Support for FluidSynth MIDI Synthesizer is now
+    included in the Windows Visual Studio builds by
+    default. Set "mididevice=fluidsynth" and a sound
+    font (e.g. GeneralUser_GS.sf2) to use it. (Wengier)
+  - Updated the MUNT MT32 emulation library to its
+    latest version 2.4.0. A few new MT32 config options
+    (starting with "mt32.") are added to [midi] section
+    of the DOSBox-X configuration. (Wengier)
+  - The DOSMID and MPXPLAY programs have been built
+    into DOSBox-X, both can be found on the Z drive and
+    feature full-screen user interfaces with support
+    for command-line usages (use /? option for help).
+    DOSMID can play MIDI/RMI/MUS audio files, whereas
+    MPXPLAY is a powerful and flexible audio player
+    with support for a variety of formats including
+    AAC/AC3/APE/FLAC/MP2/MP3/MPC/OGG/WAV and more with
+    playlist support. (Wengier)
+  - The mounting options "Mount as Hard Disk", "Mount
+    as CD-ROM", "Mount as Floppy", "Mount disk image"
+    and "Boot from disk image" (previously only for
+    Windows) in the "Drive" menu and the "Quick launch
+    program..." in the "DOS" menu are now available
+    for non-Windows platforms as well. (Wengier)
+  - Added "Shared Windows clipboard functions" menu
+    group under "Main", which allows you to enable
+    or disable the different ways for DOSBox-X to
+    communicate with the Windows clipboard. (Wengier)
+  - Added config option "dos clipboard api" in [dos]
+    section to control whether to enable the DOS APIs
+    for communications with the Windows clipboard for
+    DOS applications. (Wengier)
+  - Added config option "clip_mouse_button" to select
+    a mouse button (middle, right, or none; with right
+    mouse button being the default) for copying to and
+    pasting from the Windows clipboard. (Wengier)
+  - The mouse wheel movements will be automatically
+    converted into up/down arrows by default for the
+    intergrated DOS now. You can also enable it for
+    the guest system from the "Main" menu ("mouse wheel
+    movements" -> "Enable for guest systems also") or
+    from the config file. (Wengier)
+  - Added "Emulate CPU speed" menu group (under "CPU")
+    to emulate the speed of a specific CPU class. The
+    cycles to emulate are approximations of the actual
+    CPU hardware, and they are available thanks to data
+    provided by the user maximus105. Also added config
+    option "cycle emulation percentage adjust" in [cpu]
+    section for users who would like to make relative
+    percentage adjustments (between -25% and 25%) in
+    case it is necessary. (Wengier)
+  - Added SORT command from FreeDOS. It can be used to
+    sort input, e.g. "TYPE FILE.TXT | SORT". (Wengier)
+  - Added DELTREE command to delete a directory and all
+    the subdirectories and files in it as in a real DOS
+    system. Please use it with caution. (Wengier)
+  - The command for starting the Configuration Tool has
+    been renamed from "SHOWGUI" to "CFGTOOL". A new
+    command-line option -gui is added to CONFIG command
+    to start the Configuration Tool as well. (Wengier)
+  - DOSBox-X now includes ZIP.EXE and UNZIP.EXE from
+    InfoZip for zipping and unzipping files in DOS.
+    Both programs will appear on the Z drive. (Wengier)
+  - The powerful DOS CD player called SJGPLAY has been
+    built into DOSBox-X. You can now find the program
+    CDPLAY.EXE in the Z drive for playing Audio CDs in
+    DOS, which supports both graphical and command-line
+    usage, and you will also find a text file named
+    CDPLAY.TXT in the Z drive for a quick usage guide.
+    A zip package including full documentation and some
+    extras will additionally appear as SJGPLAY.ZIP in
+    the Z drive. This freeware program was written by
+    Steve Gray and is now included in DOSBox-X with
+    explicit permission of the author. (Wengier)
+  - DOSBox-X will now by default show a quit warning
+    if a DOS program or game, or a guest system is
+    running. The previous behavior can be set with
+    "quit warning=autofile". (Wengier)
+  - The welcome banner when DOSBox-X starts has been
+    improved for a better looking and should provide
+    more helpful instructions for users. (Wengier)
+  - Add new "Help" menu which includes menu items
+    "Introduction", "DOSBox-X homepage", "DOSBox-X Wiki
+    guide", "DOSBox-X support" and "About". (Wengier)
+  - Improved the message when automatically re-running
+    the executable which failed with the "Packed file
+    is corrupt" error. Also added the "autoloadfix"
+    config option which when set to "false" will not
+    automatically re-run such programs. (Wengier)
+  - The display for several section names in DOSBox-X's
+    graphical configuration tool has been capitalized
+    or modified otherwise to look better. A default
+    shortcut key HOST(F11/F12)+C is added for starting
+    the graphical configuration tool. (Wengier)
+  - Added the "Show advanced options" checkbox in the
+    main screen of the Configuration GUI to toggle
+    whether to display all config options for the
+    sections. If unchecked (default), it will show
+    common config options instead of all of them. A
+    new config option "show advanced options" is added
+    which when set to "true" will make the checkbox
+    checked by default. (Wengier)
+  - Added code to cap the scan line length given to
+    the VESA BIOS given the video mode. This prevents
+    VBETEST.EXE from doing test patterns smaller than
+    the actual display, which can happen with 32bpp
+    320x200 modes and 1MB or less video RAM.
+  - VESA BIOS Set Scan Line Length fixed to properly
+    report and handle scan line length for 16-color
+    SVGA planar modes. VBETEST 16-color modes now
+    display correctly.
+  - Added option to control whether VESA BIOS panning
+    (the original VBE call) waits for vsync.
+  - Moved video related config options from [dosbox]
+    section to its own [video] section. These options
+    in existing config files will be automatically
+    redirected to the [video] section from the [dosbox]
+    section when DOSBox-X starts. Windows installer can
+    also move such config options from existing config
+    files automatically. (Wengier)
+  - Cleared modem phone book before parsing it. Thank
+    NicknineTheEagle for the improvement.
+  - Improved the help message of MOUNT command. Also
+    added option -examples to show its usage examples,
+    similar to IMGMOUNT and IMGMAKE commands. (Wengier)
+  - Fixed freeze when trying to reboot the internal
+    DOS when using a different code page and it is in
+    CGA or EGA emulation modes. (Wengier)
+  - DOSBox-X will now try to use the internal DOS date
+    and time (instead of always using the host date and
+    date) for file modication timestamps. (Wengier)
+  - Added menu item "Expanded memory (EMS)" under "DOS"
+    menu to dynamically enable or disable EMS memory
+    at run-time. You can now also modify EMS memory
+    with CONFIG command from command-line. (Wengier)
+  - Added config option "drive z hide files" (in [dos]
+    section) to hide or remove files listed (separated
+    by spaces) from the Z drive. If a file has a "/"
+    prefix (e.g. "/INTRO.COM"), then the specified file
+    will have the hidden attribute ("DIR /A" will list
+    all such files) instead of completely disappearing
+    from the Z drive. (Wengier)
+  - You can now add your own programs or files to the
+    Z drive! Put your programs or files in the drivez
+    directory located in the DOSBox-X program folder
+    or the DOSBox-X configuration directory, and they
+    will automatically appear on the Z drive. If any of
+    the files have the same names as the built-in ones,
+    they will replace the built-in files. For example,
+    you can replace the built-in EDIT.COM and XCOPY.EXE
+    programs (from FreeDOS) with MS-DOS counterparts.
+    Windows installer will now automatically create a
+    drivez directory with a README.TXT file in it too.
+    For subdirectories support please use MOUNT command
+    to mount local directory instead. (Wengier).
+0.83.5
+  - Windows installer now offers the option to upgrade
+    the DOSBox-X config file (dosbox-x.conf) to the
+    latest version format automatically while keeping
+    users' current settings. It can also add a context
+    menu for executables (.exe, .com, .bat), config
+    files (.conf) and folders in the Windows Explorer
+    so that you could quickly run or open them with
+    DOSBox-X from the Windows Explorer. More icons
+    are added to the DOSBox-X program group within the
+    Start menu as well. (Wengier)
+  - Added config option "startbanner" in [dosbox]
+    section which if set to "false" would skip the
+    welcome banner when DOSBox-X starts. Also added
+    config option "fastbioslogo" which if set to "true"
+    will skip the BIOS logo (replacing the command-line
+    option -fastbootlogo). A new command-line option
+    "-fastlaunch" is added to enable fast launch mode
+    by skipping both the logo and the banner. (Wengier)
+  - Added config option "ega per scanline hpel" in
+    [dosbox] section to control whether EGA emulation
+    latches hpel at display start (as VGA emulation
+    does) or allows hpel to change per scanline.
+    Setting the option to false is needed for some
+    games like Commander Keen.
+  - Support for mounting CD images with a sector size
+    of 2448, used by for example the MDF image of the
+    game Grand Theft Auto. (Wengier)
+  - Allowed Sound Blaster to be enabled by the games
+    "Desert Strike" and "Jungle Strike". (Wengier)
+  - Sound Blaster Pro emulation now maps DSP commands
+    0x41 to 0x47 as aliases of 0x40 (set time constant)
+    to support broken demoscene code that uses 0x41
+    in that way. Yes, such code would obviously break
+    on clone cards and the SB16. Added a config option
+    "dsp command aliases" in [sblaster] section to turn
+    it off for debugging. Alias is documented on Vogons
+    forums where someone made a SB Pro clone card.
+  - Fixed the issue with CD audio play by porting the
+    audio code from DOSBox ECE. (Wengier)
+  - COPY command now assumes /Y automatically when
+    running in the batch file or with CALL command
+    (or COMMAND /C) as in real DOS. (Wengier)
+  - DOSBox-X will allow control characters 8 (BS),
+    9 (TAB), 26 (SUB), and 27 (ESC) when executing GOTO
+    command in batch files without warnings. (Wengier)
+  - Normal core: REP MOVSD now checks segment limits
+    for ES:(E)DI and throws a GP fault if exceeded.
+    Demoscene productions marked as using VESA BIOS
+    modes and scribbling on the VGA BIOS are relying
+    on segment limits and GP faults to fake a linear
+    framebuffer.
+  - Added config option "vesa bank switching window
+    range check" to allow disabling the VESA BIOS
+    window number range check when called on to
+    bank switch. Needed for "Pill" by Opiate in the
+    end credits, which for some reason requires a
+    call for window number 0xFFFF to succeed in order
+    to draw credits without glitching.
+  - Added config option "vesa bank switching window
+    mirroring" for instructing VESA BIOS to ignore
+    bank switching window parameter when asked to
+    get/set bank switching window setting. Needed for
+    some old demoscene and game applications that
+    assume Window B is available, and will not render
+    SVGA properly without it.
+  - Added config option "quit warning" to indicate if
+    DOSBox-X should warn show a warning message when
+    you try to close the DOSBox-X window. If set to
+    "auto" (default), DOSBox-X will warn only if at
+    least one file handle is still open, or you are
+    currently running a guest system. (Wengier)
+  - Added command-line option "-defaultconf" to use the
+    default config settings. (Wengier)
+  - Added command-line option "-defaultdir" to specify
+    a directory (instead of the current directory) as
+    the working directory. DOSBox-X will look for the
+    dosbox-x.conf file in this directory. (Wengier)
+  - The -winrun command-line option will also enable
+    LFN support with "lfn=auto" on Windows. (Wengier)
+  - VER /R now shows DOSBox-X's Git commit SHA1, in
+    addition to the build date and other version
+    information shown by the VER command. (Wengier)
+  - Fixed that joystick may not work with the setting
+    "usescancodes=auto" when a non-US keyboard layout
+    is activated on the SDL1 build. (Wengier)
+  - DOSBox-X will now search for system fonts if the
+    fonts required for the printing feature cannot be
+    found in the FONTS directory. (Wengier)
+  - Added menu item "Send form-feed" under the DOS menu
+    for manually ejecting new pages to print. (Wengier)
+  - Added "Quick launch program..." menu (under "DOS")
+    to quickly run the specified program as selected
+    by the Windows file browser in DOSBox-X. (Wengier)
+  - Added "Drive information" menu item under "Drive"
+    menu to show information for the specified drive,
+    and added "Show mounted drive numbers" menu item
+    under "DOS" menu to show details for all mounted
+    drive numbers (0-5). (Wengier)
+  - The command "Swap CD" now swaps only CD drives (as
+    the name), not all non-floppy drives. Also added
+    "Swap disk" menu item under the "Drive" menu for
+    swapping individual mounted drives. (Wengier)
+  - IMGMAKE now tries to resolve home directory (~)
+    on Linux and macOS platforms. Also improved the
+    help message for this command. (Wengier)
+  - Fixed unmounting swap disks when unmounting drives
+    with MOUNT or IMGMOUNT command. (Wengier)
+  - Fixed possible failure when mounting .VHD images,
+    and the issue that leading colon (:) or read-only
+    marker may not work for such images. (Wengier)
+  - IMGMOUNT command without parameters now shows the
+    disk position and number of swap disks, as well as
+    IDE controller (if applicable). Also added option
+    -examples to show its usage examples. (Wengier)
+  - Add "-ro" option for IMGMOUNT command to mark all
+    disk images as read-only at once. You could also
+    mark read-only disk images individually using the
+    leading colon as in previous versions. (Wengier)
+  - The default value for "output" (in "sdl" section)
+    is now "default", which will default to the value
+    according to your platform. (Wengier)
+  - The -Q (quiet) option of MOUNT, BOOT and RESCAN
+    commands now silences virtually all outputs (error
+    and normal messages) of these commands. (Wengier)
+  - Worked around the mounting issue with LaunchBox,
+    by allowing a mounting command-line with single
+    quotes like MOUNT C 'X:\DOS' on Windows. (Wengier)
+  - Unmounting ISO drives will auto-unmount associated
+    El Torito floppy drives (if any) too. (Wengier)
+  - Updated xxHash library by Yann Collet from 0.7.4
+    to the stable version 0.8.0. (Wengier)
+  - Added support for the OPL2 audio board by setting
+    the config option "oplemu=opl2board".
+  - The save state feature now tries to save and then
+    restore the mounted drives of all types (if the
+    paths or image files still exist on host system).
+    This fixes the "save state corrupted" error while
+    trying to load saved states but the drives are not
+    yet mounted in DOSBox-X. (Wengier)
+  - The save state feature now verifies the emulated
+    machine type (VGA, PC98, etc) too when loading a
+    saved state. All confirm and error dialog boxes
+    for saving or loading states appear in a cross-
+    platform manner now, instead of only on Windows
+    systems. Also added the option to remove the saved
+    state in the selected save slot. (Wengier)
+  - Increased the number of save slots from 10 to 100.
+    Each page in the save slot menu (under "Capture")
+    still shows 10 slots as before, but you can now go
+    to the previous or next page (up to 10 pages) for
+    more save slots (100 in total). (Wengier).
+  - The [pci] section is now the [voodoo] section, and
+    the config option "voodoo" (the only option of that
+    section) is now named "voodoo_card" within the
+    [voodoo] section to make clear it is for emulating
+    the Voodoo card hardware. Also added config option
+    "voodoo_maxmem" (default: true) to specify whether
+    to use the maximum memory size (12MB instead of the
+    standard 4MB) for the Vooodoo card. (Wengier)
+  - Added support for Glide wrapper. It can be enabled
+    with the new config option "glide" set to "true"
+    in [voodoo] section. The library file glide2x.dll
+    (Windows)/libglide2x.so (Linux)/libglide2x.dylib
+    (macOS) is required for Glide to work. Be sure to
+    use 32-bit dll for 32-bit DOSBox-X binary, and
+    64-bit dll for 64-bit DOSBox-X binary. (Wengier)
+0.83.4
+  - Fixed loading saved states in fullscreen mode with
+    the "aspect=true" setting. (Wengier)
+  - Added config option "saveslot" to select default
+    save slot (1-10). The timestamps for the saved
+    states will also be shown in the menu. (Wengier)
+  - Added key mapper for sending the Ctrl+Alt+Del key,
+    with HOST(F11/F12)+Del by default. (Wengier)
+  - Added dosbox-x.conf setting to ignore the EGA/VGA
+    "extended memory" bit. It was originally defined
+    back when stock EGA/VGA cards could ship with 64KB
+    of memory. The option is needed for DOS games that
+    accidentally clear the bit when using unchained
+    256-color modes (Mr. Blobby).
+  - Added new default value "auto" for the setting
+    "usescancodesauto" (in [sdl] section of the config
+    file) to work around issues with non-US keyboard
+    layouts on SDL1 builds. (Wengier)
+  - Added code pages 808, 850, 852, 853, 855, 857,
+    858, 869, 872 for host to guest codepage mapping
+    on mounted local or overlay drives. (Wengier)
+  - The mapper options "Increase recording volume" and
+    "Decrease recording volume" as well as function
+    "Show sound levels" (from MIXER command) appear
+    now as menu items (under "Sound") too. (Wengier)
+  - Fixed inputting of ASCII character 224 and 240
+    in Windows SDL2 or MinGW builds. (Wengier)
+  - Fixed possible DPMI error when running Windows
+    98 installation from the DOSBox-X shell without
+    using a batch file. (Wengier)
+  - Fixed a bug in the FAT driver that can cause
+    a byte to get lost if writing up to the end of
+    a cluster, which seems to be behind the
+    corruption with program group files when running
+    Windows for Workgroups 3.11 from DOSBox-X shell.
+    [https://github.com/joncampbell123/dosbox-x/issues/1758#issuecomment-665193066]
+  - Unknown INT 2Fh calls are now debug output, not
+    an error.
+  - Added VESA BIOS mode 68h alias as indicated on
+    the Vogons forum.
+  - Fixed handling of config commands with spaces
+    when the "shell configuration as commands"
+    setting is enabled (quotes are needed in such
+    cases). Also added "Config options as commands"
+    toggle menu (under "DOS") to enable/disable the
+    feature from menu. It is disabled by default to
+    avoid name clash with other programs. (Wengier)
+  - Added "Enable quick reboot" toggle menu (under
+    "DOS") so that when enabled, DOS restart calls
+    will reboot the emulated DOS (integrated or
+    guest DOS) instead of the virtual machine in
+    DOSBox-X. Also, you could change the default
+    setting for this by setting the new "quick
+    reboot" config option in "dos" section (Wengier)
+  - Added new "Reboot guest system" menu item (under
+    "Main") to reboot the kernel of the integrated
+    DOS or the guest DOS directly. The previous menu
+    item "Reset guest system" has been renamed to
+    "Reset virtual machine" which will restart the
+    virtual machine in DOSBox-X instead. (Wengier)
+  - Added "Reported DOS version" sub-menu (under
+    "DOS") to dynamically change the reported DOS
+    version (3.3, 5.0, 6.22, 7.1, or custom). This
+    may enable/disable long filename (LFN) support
+    with the default "lfn=auto" setting. (Wengier)
+  - LS is now an external command appearing on drive
+    Z: as LS.COM instead of a builtin shell command.
+    This avoids name clash with game "Links LS 97"
+    which has the main executable named LS.EXE. Also
+    fixed minor issues in this command. (Wengier)
+  - Fixed the game "Disney's Duck Tales: the Quest
+    for Gold" not able to start. (Wengier)
+  - Improved Configuration GUI's handling of "4dos"
+    and "config" sections. Also added the "Save..."
+    button just before the "Close" button. (Wengier)
+  - Added "euro" config option (in [render] section)
+    to display Euro symbol instead of the specified
+    ASCII character in any code page. (Wengier)
+  - PC-98 CG MMIO writes fixed to limit writes only
+    to the user-defined areas, same as the IO writes.
+    This fixes "Niko Niko" that appears to write a
+    few too many 0xE1 bytes when filling text
+    attribute RAM and into the CG MMIO region.
+  - With -winrun command-line option or the setting
+    "startcmd=true" (Windows only), you can now
+    directly launch Windows programs on mounted local
+    or overlay drives to run on the host. The option
+    "startwait=false" can be used to disable waiting
+    for Windows programs after started. This can also
+    be toggled from the "DOS" menu. (Wengier)
+  - Added START command to run commands on Windows
+    host system. The /MAX, /MIN, /HID options can
+    be used to run the specified program maximized,
+    minimized, or hidden (they can be shortened to
+    +, -, _ respectively). This command is disabled
+    by default, but can be enabled by either the
+    "startcmd" config option (in [dos] section) or
+    the -winrun command-line option (which will also
+    enable the CLIP$ device for Windows clipboard
+    support). START will run commands listed in the
+    "startincon" config option (separated by space)
+    in the Windows Command Prompt and wait for a key
+    press before exiting. (Wengier)
+  - Added SHELL= option to the [config] section in
+    dosbox-x.conf to specify an alternative shell,
+    e.g. "SHELL=4DOS.COM". (Wengier)
+  - Added built-in 4DOS 8.00 shell for 4DOS features
+    and capabilities. There is now a [4dos] section
+    in the dosbox-x.conf file to act as the 4DOS.INI
+    config file if you use this shell. (Wengier)
+  - Added "Mouse wheel movements" menu (under "Main")
+    to enable or disable the mouse wheel movements
+    to arrow (up/down etc) feature. (Wengier)
+  - Added "Quick right mouse button copy/paste" menu
+    item toggle to allow quick Windows clipboard copy
+    and paste via the right mouse button without any
+    key modifier that may have been specified by the
+    config option "clip_key_modifier". (Wengier)
+  - Fixed mounting a directory with command-line like
+    "dosbox-x .", and fixed mounting disk images with
+    spaces via the "Drive" menu on Windows. (Wengier)
+  - Added "mountwarning" config setting so you could
+    optionally disable the warning when attempting to
+    mount C:\ in Windows or / otherwise. (Wengier)
+  - IMGMOUNT now assumes "-fs none" automatically if
+    a drive number is specified instead of a drive
+    letter. Moreover, it will assume the image file
+    name "IMGMAKE.IMG" if no filename is specified by
+    the user. Also improved the command's handling of
+    El Torito floppy drives, e.g. you can use option
+    "-bootcd d" instead of "-el-torito d". (Wengier)
+  - IMGMAKE warning replaced to indicate a general
+    incompatibility between MS-DOS/SCANDISK and
+    cluster sizes 64KB or larger.
+  - IMGMAKE command will now use the image file name
+    "IMGMAKE.IMG" if no file name is specified (either
+    in the mounted local directory or in the DOSBox-X
+    program directory if the current directory is not
+    a local directory). The command now also supports
+    a -force option to force overwrite the image file
+    if it already exists. Furthermore, IMGMAKE will
+    delete the generated image file if an error occurs
+    during the image file creation. (Wengier)
+    
 0.83.3
-  - Support for mounting cues files with MP3/OGG/WAV/FLAC
+  - IMGMAKE can now generate FAT12, FAT16, and FAT32
+    filesystems. New option "-fat" is added to select
+    the filesystem for the disk image.
+  - Fixed command-line like "./dosbox-x /dir/app.bat"
+    not able to launch the specified program (Wengier)
+  - Fixed bug in DIR command's /P option which might
+    cause it to not work properly. (Wengier)
+  - The default key modifier for the Windows clipboard
+    copy & paste via the right mouse button feature is
+    now "shift" instead of "disabled". (Wengier)
+  - Single-stepping in the debugger with the 286 and
+    8086 normal cores now works correctly when stepping
+    over instructions with a segment prefix.
+  - Pentium MMX instructions now only available for
+    Pentium MMX or higher. Fixed the bug that allowed
+    MMX instructions for Pentium and lower if programs
+    ignored the CPUID feature bits. Also fixed Pentium
+    MMX instructions so that they work in both 16-bit
+    real mode and 32-bit protected mode to match how
+    they work in real hardware (joncampbell123)
+  - Updated DOSBox-X's implementation for Pentium MMX
+    instructions to latest version by kekko (Wengier)
+  - DOSBox-X will try to automatically run the program
+    with LOADFIX if the error message "Packed file is
+    corrupt" is detected. (Wengier)
+  - MOUNT command can now mount a drive to the UNC
+    root path in the form \\ComputerName\SharedFolder
+    on Windows systems. (Wengier)
+  - Improved the HX-DOS build package to make it fully
+    automated: all required HX DOS Extender files will
+    be included in the package, and dosbox-x.exe can
+    now be run directly in a real DOS system without
+    external requirements. (Wengier)
+  - Fixed incorrect frame rate reported by 3Dfx Voodoo
+    emulation (rderooy, backported from DOSBox SVN).
+  - Added the "Boot from disk image" menu item (A:, C:,
+    and D: drives only) in the "Drive" menu to boot the
+    specified disk image directly in Windows. (Wengier)
+  - Support for converting mouse wheel movements into
+    keyboard presses like arrow keys, configurable by
+    the option "mouse_wheel_key" (default is 0 which
+    disables this feature). When set to 1, mouse wheel
+    movements are converted to up/down arrows. Setting
+    it to 2 or 3 converts such movements to left/right
+    arrows or PageUp/PageDn keys respectively. (Wengier)
+  - Support for reloading the keyboard mapper file with
+    the config -set command. (Wengier)
+  - IMGMOUNT command without parameters will show disk
+    names for drive-number only mounts. (Wengier)
+  - IMGMOUNT can now autodetect DOS <= 3.21 harddisk
+    geometry with MFM sector images (rderooy & Wengier)
+  - IMGMOUNT -fs none fixed to use same geometry detect
+    function that FAT filesystem mounting uses.
+  - Added suppprt for mounting overlay drives using MOUNT
+    command with "-t overlay" option. Backported from
+    DOSBox SVN and adopted for DOSBox-X with additional
+    features such as long filename and PC-98 support, it
+    allows the users to redirect new and changed file(s)
+    to a different location transparently. (Wengier)
+  - Cleaned up the DPI awareness auto-detection code to
+    allow Visual Studio builds to again run on Windows 7.
+    Meanwhile, MinGW builds (either SDL1 or SDL2 version)
+    are still required for Windows XP systems. (Wengier)
+  - Updated Nuked OPL3 to latest version 1.8 for accurate
+    OPL3 emulation (Wengier)
+  - Added AUTOTYPE command to perform scripted keyboard
+    entry into a running DOS program or game. Ported from
+    DOSBox-staging, it can be used to reliably skip intro,
+    provide input to answer initial startup or config
+    questions, or conduct a simple demo. (Wengier)
+  - Added code page 866 (Cyrillic Russian) to support
+    host to guest code page mapping (tuffnatty)
+  - Mouse buttons (left, middle, right) can now be mapped
+    to keys in the keyboard mapper. (Wengier)
+  - Support for mounting .cue files with MP3/OGG/WAV/FLAC
     compressed audio tracks. (Wengier) 
   - Rewrote the Windows installer for DOSBox-X, as well as
     the building script for the installer. All required
@@ -20,9 +1815,10 @@
     It is also fixed not to crash when used within a guest
     operting system (when the DOS kernel has been shut down
     using the BOOT command);
+    It now supports memory size up to 1GB;
     It will save and verify the DOSBox-X version and build.
     States saved by DOSBox-X in one platform (e.g. 64-bit
-    Windows) may not work in another (e.g. 32-bit Linux). 
+    Windows) may not work in another (e.g. 32-bit Linux).
     The GUI menu will show if the save slot is empty, and if
     not the program name of save state will be displayed.
   - Re-ported and improved the save state feature for saving
@@ -61,6 +1857,7 @@
     phone book file entries need to be in the format of:
     "<dummy number> <hostname/ip:port>" e.g.
     5551234 cavebbs.homeip.net:23
+    Thank NicknineTheEagle for implementing this feature.
   - Implemented the missing EMS subfunctions 52h and 59h by
     porting the patch that adds them (Wengier)
   - Fixed issues with the "config -wcd -all" command and other
@@ -217,6 +2014,10 @@
     implementation of FluidSynth. (Wengier)
 
 0.83.1
+  - dosbox-x.conf is now recognized as the default config
+    file name in addition to dosbox.conf. The sample config
+    file "dosbox.reference.conf" has been renamed to
+    "dosbox-x.reference.conf" as well (Wengier)
   - Sound Blaster emulation fixed to better handle Goldplay
     mode detection false positive in 1994 demoscene demo
     myth_dw.zip when using Sound Blaster Pro setting in
@@ -224,10 +2025,6 @@
     like Goldplay mode, but when music actually starts the
     DMA programmed to normal state without restarting
     DMA playback.
-  - dosbox-x.conf is now recognized as the default config
-    file name in addition to dosbox.conf. The sample config
-    file "dosbox.reference.conf" has been renamed to
-    "dosbox-x.reference.conf" as well (Wengier)
   - Tandy DAC output fixed to slowly ramp last sample to
     zero DC sample (128) when switched off. This fixes
     loud popping (DC offset) problems with Tandy DAC

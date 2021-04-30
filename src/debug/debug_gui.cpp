@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2020  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <fstream>
 
 #if defined(WIN32)
 #include <conio.h>
@@ -77,7 +78,7 @@ std::string DBGBlock::windowlist_by_name(void) {
 }
 
 const unsigned int dbg_def_win_height[DBGBlock::WINI_MAX_INDEX] = {
-    5,          /* WINI_REG */
+    7,          /* WINI_REG */
     9,          /* WINI_DATA */
     12,         /* WINI_CODE */
     5,          /* WINI_VAR */
@@ -105,6 +106,16 @@ static list<string> logBuff;
 static list<string>::iterator logBuffPos = logBuff.end();
 
 extern int old_cursor_state;
+
+bool savetologfile(const char *name) {
+    std::ofstream out(name);
+    if (!out.is_open()) return false;
+    std::list<string>::iterator it;
+    for (it = logBuff.begin(); it != logBuff.end(); ++it)
+        out << (std::string)(*it) << endl;
+    out.close();
+    return true;
+}
 
 const char *DBGBlock::get_winname(int idx) {
     if (idx >= 0 && idx < DBGBlock::WINI_MAX_INDEX)
@@ -350,6 +361,18 @@ static void Draw_RegisterLayout(void) {
 	mvwaddstr(dbg.win_reg,2,75,"CPL");
 	mvwaddstr(dbg.win_reg,2,68,"IOPL");
 
+	mvwaddstr(dbg.win_reg,4,0,"ST0=");
+	mvwaddstr(dbg.win_reg,5,0,"ST4=");
+
+	mvwaddstr(dbg.win_reg,4,14,"ST1=");
+	mvwaddstr(dbg.win_reg,5,14,"ST5=");
+
+	mvwaddstr(dbg.win_reg,4,28,"ST2=");
+	mvwaddstr(dbg.win_reg,5,28,"ST6=");
+
+	mvwaddstr(dbg.win_reg,4,42,"ST3=");
+	mvwaddstr(dbg.win_reg,5,42,"ST7=");
+
 	mvwaddstr(dbg.win_reg,1,52,"C  Z  S  O  A  P  D  I  T ");
 }
 
@@ -399,7 +422,7 @@ static void DestroySubWindows(void) {
         WINDOW* &ref = dbg.get_win_ref((int)wnd);
 
         if (ref != NULL) {
-            if (ref) delwin(ref);
+            delwin(ref);
             ref = NULL;
         }
     }
@@ -540,7 +563,7 @@ void DEBUG_FlushInput(void) {
 }
 
 void DBGUI_StartUp(void) {
-	mainMenu.get_item("show_console").check(true).refresh_item(mainMenu);
+	mainMenu.get_item("show_console").check(true).enable(false).refresh_item(mainMenu);
 
 	LOG(LOG_MISC,LOG_DEBUG)("DEBUG GUI startup");
 	/* Start the main window */
@@ -775,7 +798,7 @@ void LOG::operator() (char const* format, ...){
 
 	if (d_type>=LOG_MAX) return;
 	if (d_severity < loggrp[d_type].min_severity) return;
-	DEBUG_ShowMsg("%10u%s %s:%s\n",static_cast<Bit32u>(cycle_count),s_severity,loggrp[d_type].front,buf);
+	DEBUG_ShowMsg("%10u%s %s:%s\n",static_cast<uint32_t>(cycle_count),s_severity,loggrp[d_type].front,buf);
 }
 
 void LOG::ParseEnableSetting(_LogGroup &group,const char *setting) {
@@ -797,6 +820,7 @@ void LOG::ParseEnableSetting(_LogGroup &group,const char *setting) {
 		group.min_severity = LOG_NORMAL;
 }
 
+void ResolvePath(std::string& in);
 void LOG::Init() {
 	char buf[64];
 
@@ -814,14 +838,15 @@ void LOG::Init() {
 	assert(sect != NULL);
 
 	/* do we write to a logfile, or not? */
-	const char *blah = sect->Get_string("logfile");
-	if (blah != NULL && blah[0] != 0) {
-		if ((debuglog=fopen(blah,"wt+")) != NULL) {
-			LOG_MSG("Logging: opened logfile '%s' successfully. All further logging will go to that file.",blah);
+	std::string logfile = sect->Get_string("logfile");
+	if (logfile.size()) {
+		ResolvePath(logfile);
+		if ((debuglog=fopen(logfile.c_str(),"wt+")) != NULL) {
+			LOG_MSG("Logging: opened logfile '%s' successfully. All further logging will go to this file.",logfile.c_str());
 			setbuf(debuglog,NULL);
 		}
 		else {
-			LOG_MSG("Logging: failed to open logfile '%s'. All further logging will be discarded. Error: %s",blah,strerror(errno));
+			LOG_MSG("Logging: failed to open logfile '%s'. All further logging will be discarded. Error: %s",logfile.c_str(),strerror(errno));
 		}
 	}
 	else {
@@ -921,6 +946,7 @@ void LOG::SetupConfigSection(void) {
 	Section_prop * sect=control->AddSection_prop("log",Null_Init);
 	Prop_string* Pstring = sect->Add_string("logfile",Property::Changeable::Always,"");
 	Pstring->Set_help("file where the log messages will be saved to");
+	Pstring->SetBasic(true);
 	char buf[64];
 	for (Bitu i = LOG_ALL + 1;i < LOG_MAX;i++) {
 		safe_strncpy(buf,loggrp[i].front, sizeof(buf));

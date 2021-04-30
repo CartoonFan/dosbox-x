@@ -12,11 +12,11 @@ using namespace std;
 #if C_DIRECT3D
 
 CDirect3D* d3d = NULL;
-
-static void d3d_init(void) 
+void ResolvePath(std::string& in);
+void d3d_init(void)
 {
     sdl.desktop.want_type = SCREEN_DIRECT3D;
-    if (!sdl.using_windib) 
+    if (!sdl.using_windib)
     {
         LOG_MSG("Resetting to WINDIB mode");
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
@@ -30,7 +30,11 @@ static void d3d_init(void)
     SDL_SysWMinfo wmi;
     SDL_VERSION(&wmi.version);
 
-    if (!SDL_GetWMInfo(&wmi)) 
+#if defined(C_SDL2)
+    if (!SDL_GetWindowWMInfo(sdl.window, &wmi))
+#else
+    if (!SDL_GetWMInfo(&wmi))
+#endif
     {
         LOG_MSG("SDL:Error retrieving window information");
         LOG_MSG("Failed to get window info");
@@ -50,7 +54,11 @@ static void d3d_init(void)
             OUTPUT_SURFACE_Select();
             return;
         }
-        else if (d3d->InitializeDX(wmi.child_window, sdl.desktop.doublebuf) != S_OK) 
+#if defined(C_SDL2)
+        else if (d3d->InitializeDX(wmi.info.win.window, sdl.desktop.doublebuf) != S_OK)
+#else
+        else if (d3d->InitializeDX(wmi.child_window, sdl.desktop.doublebuf) != S_OK)
+#endif
         {
             LOG_MSG("Unable to initialize DirectX");
             OUTPUT_SURFACE_Select();
@@ -60,9 +68,11 @@ static void d3d_init(void)
 
 # if (C_D3DSHADERS)
     if (d3d) {
-        Section_prop *section = static_cast<Section_prop *>(control->GetSection("sdl"));
+        Section_prop *section = static_cast<Section_prop *>(control->GetSection("render"));
         Prop_multival* prop = section->Get_multival("pixelshader");
-        if (SUCCEEDED(d3d->LoadPixelShader(prop->GetSection()->Get_string("type"), 0, 0)))
+        std::string path = prop->GetSection()->Get_string("type");
+        ResolvePath(path);
+        if (SUCCEEDED(d3d->LoadPixelShader(path.c_str(), 0, 0)))
             if (menu.startup)
                 GFX_ResetScreen();
     }
@@ -81,7 +91,6 @@ void OUTPUT_DIRECT3D_Select()
 {
     sdl.desktop.want_type = SCREEN_DIRECT3D;
     render.aspectOffload = true;
-    d3d_init();
 
 #if defined(WIN32) && !defined(C_SDL2)
     SDL1_hax_inhibit_WM_PAINT = 1;
@@ -102,10 +111,10 @@ Bitu OUTPUT_DIRECT3D_SetSize()
 {
     Bitu retFlags = 0;
 
-    Bit16u fixedWidth;
-    Bit16u fixedHeight;
-    Bit16u windowWidth;
-    Bit16u windowHeight;
+    uint16_t fixedWidth;
+    uint16_t fixedHeight;
+    uint16_t windowWidth;
+    uint16_t windowHeight;
     Bitu adjTexWidth = sdl.draw.width;
     Bitu adjTexHeight = sdl.draw.height;
 
@@ -137,8 +146,8 @@ Bitu OUTPUT_DIRECT3D_SetSize()
         int cw = fixedWidth, ch = fixedHeight;
         Bitu scale = 1;
 
-        if (cw == 0) cw = (Bit16u)(sdl.draw.width * sdl.draw.scalex);
-        if (ch == 0) ch = (Bit16u)(sdl.draw.height * sdl.draw.scaley);
+        if (cw == 0) cw = (uint16_t)(sdl.draw.width * sdl.draw.scalex);
+        if (ch == 0) ch = (uint16_t)(sdl.draw.height * sdl.draw.scaley);
 
         while ((cw / scale) >= (640 * 2) && (ch / scale) >= (400 * 2))
             scale++;
@@ -160,8 +169,8 @@ Bitu OUTPUT_DIRECT3D_SetSize()
     }
     else 
     {
-        windowWidth = (Bit16u)(sdl.draw.width * sdl.draw.scalex);
-        windowHeight = (Bit16u)(sdl.draw.height * sdl.draw.scaley);
+        windowWidth = (uint16_t)(sdl.draw.width * sdl.draw.scalex);
+        windowHeight = (uint16_t)(sdl.draw.height * sdl.draw.scaley);
         if (render.aspect) aspectCorrectExtend(windowWidth, windowHeight);
         sdl.clip.w = windowWidth; sdl.clip.h = windowHeight;
     }
@@ -209,12 +218,14 @@ Bitu OUTPUT_DIRECT3D_SetSize()
 #endif
 
 #if (C_D3DSHADERS)
-    Section_prop *section = static_cast<Section_prop *>(control->GetSection("sdl"));
+    Section_prop *section = static_cast<Section_prop *>(control->GetSection("render"));
     if (section) 
     {
         Prop_multival* prop = section->Get_multival("pixelshader");
         std::string f = prop->GetSection()->Get_string("force");
-        d3d->LoadPixelShader(prop->GetSection()->Get_string("type"), sdl.draw.scalex, sdl.draw.scaley, (f == "forced"));
+        std::string path = prop->GetSection()->Get_string("type");
+        ResolvePath(path);
+        d3d->LoadPixelShader(path.c_str(), sdl.draw.scalex, sdl.draw.scaley, (f == "forced"));
     }
     else 
     {
@@ -228,18 +239,35 @@ Bitu OUTPUT_DIRECT3D_SetSize()
     // Create a dummy sdl surface
     // D3D will hang or crash when using fullscreen with ddraw surface, therefore we hack SDL to provide
     // a GDI window with an additional 0x40 flag. If this fails or stock SDL is used, use WINDIB output
+    void GFX_SetResizeable(bool enable);
     if (GCC_UNLIKELY(d3d->bpp16)) 
     {
+#if defined(C_SDL2)
+        GFX_SetResizeable(true);
+        sdl.window = GFX_SetSDLWindowMode(windowWidth, windowHeight, SCREEN_SURFACE);
+        if (sdl.window != NULL) sdl.surface = SDL_GetWindowSurface(sdl.window);
+        else sdl.surface = NULL;
+        sdl.desktop.pixelFormat = SDL_GetWindowPixelFormat(sdl.window);
+#else
         sdl.surface = SDL_SetVideoMode(windowWidth, windowHeight, 16, sdl.desktop.fullscreen ? SDL_FULLSCREEN | 0x40 : SDL_RESIZABLE | 0x40);
         sdl.deferred_resize = false;
         sdl.must_redraw_all = true;
+#endif
         retFlags = GFX_CAN_16 | GFX_SCALING;
     }
     else 
     {
+#if defined(C_SDL2)
+        GFX_SetResizeable(true);
+        sdl.window = GFX_SetSDLWindowMode(windowWidth, windowHeight, SCREEN_SURFACE);
+        if (sdl.window != NULL) sdl.surface = SDL_GetWindowSurface(sdl.window);
+        else sdl.surface = NULL;
+        sdl.desktop.pixelFormat = SDL_GetWindowPixelFormat(sdl.window);
+#else
         sdl.surface = SDL_SetVideoMode(windowWidth, windowHeight, 0, sdl.desktop.fullscreen ? SDL_FULLSCREEN | 0x40 : SDL_RESIZABLE | 0x40);
         sdl.deferred_resize = false;
         sdl.must_redraw_all = true;
+#endif
         retFlags = GFX_CAN_32 | GFX_SCALING;
     }
 
@@ -266,13 +294,13 @@ Bitu OUTPUT_DIRECT3D_SetSize()
     return retFlags;
 }
 
-bool OUTPUT_DIRECT3D_StartUpdate(Bit8u* &pixels, Bitu &pitch)
+bool OUTPUT_DIRECT3D_StartUpdate(uint8_t* &pixels, Bitu &pitch)
 {
 #if C_XBRZ
     if (sdl_xbrz.enable && sdl_xbrz.scale_on) 
     {
         sdl_xbrz.renderbuf.resize(sdl.draw.width * sdl.draw.height);
-        pixels = sdl_xbrz.renderbuf.empty() ? nullptr : reinterpret_cast<Bit8u*>(&sdl_xbrz.renderbuf[0]);
+        pixels = sdl_xbrz.renderbuf.empty() ? nullptr : reinterpret_cast<uint8_t*>(&sdl_xbrz.renderbuf[0]);
         pitch = sdl.draw.width * sizeof(uint32_t);
         sdl.updating = true;
     }
@@ -286,7 +314,7 @@ bool OUTPUT_DIRECT3D_StartUpdate(Bit8u* &pixels, Bitu &pitch)
     return sdl.updating;
 }
 
-void OUTPUT_DIRECT3D_EndUpdate(const Bit16u *changedLines)
+void OUTPUT_DIRECT3D_EndUpdate(const uint16_t *changedLines)
 {
 #if C_XBRZ
     if (sdl_xbrz.enable && sdl_xbrz.scale_on) 
@@ -306,11 +334,11 @@ void OUTPUT_DIRECT3D_EndUpdate(const Bit16u *changedLines)
             xBRZ_Render(renderBuf, xbrzBuf, changedLines, srcWidth, srcHeight, sdl_xbrz.scale_factor);
 
             // D3D texture can be not of exactly size we expect, so we copy xBRZ buffer to the texture there, adjusting for texture pitch
-            Bit8u *tgtPix;
+            uint8_t *tgtPix;
             Bitu tgtPitch;
             if (d3d->LockTexture(tgtPix, tgtPitch) && tgtPix) // if locking fails, target texture can be nullptr
             {
-                uint32_t* tgtTex = reinterpret_cast<uint32_t*>(static_cast<Bit8u*>(tgtPix));
+                uint32_t* tgtTex = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(tgtPix));
 # if defined(XBRZ_PPL)
                 concurrency::task_group tg;
                 for (int i = 0; i < xbrzHeight; i += sdl_xbrz.task_granularity)

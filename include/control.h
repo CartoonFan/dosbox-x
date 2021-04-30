@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -77,6 +77,7 @@ public:
         opt_startui = false;
         initialised = false;
         opt_console = false;
+        opt_display2 = false;
         opt_logint21 = false;
         opt_userconf = false;
         opt_noconfig = false;
@@ -85,20 +86,25 @@ public:
         opt_eraseconf = false;
         opt_resetconf = false;
         opt_printconf = false;
+        opt_promptfolder = -1;
         opt_noautoexec = false;
         opt_securemode = false;
+        opt_fastlaunch = false;
         opt_fullscreen = false;
         opt_showcycles = false;
         opt_earlydebug = false;
         opt_break_start = false;
+        opt_defaultconf = false;
         opt_erasemapper = false;
         opt_resetmapper = false;
         opt_startmapper = false;
         opt_fastbioslogo = false;
+        opt_defaultmapper = false;
         opt_alt_vga_render = false;
         opt_date_host_forced = false;
         opt_disable_numlock_check = false;
         opt_disable_dpi_awareness = false;
+        opt_used_defaultdir = false;
         opt_time_limit = -1;
         opt_log_con = false;
     }
@@ -111,11 +117,12 @@ public:
     Section* GetSection(std::string const&_sectionname) const;
     Section* GetSectionFromProperty(char const * const prop) const;
 
-    bool PrintConfig(char const * const configfilename,bool everything=false) const;
+    bool PrintConfig(char const * const configfilename,int everything=-1,bool norem=false) const;
     bool ParseConfigFile(char const * const configfilename);
     void ParseEnv(char ** envp);
     bool SecureMode() const { return secure_mode; }
     void SwitchToSecureMode() { secure_mode = true; }//can't be undone
+    void ClearExtraData() { Section_prop *sec_prop; Section_line *sec_line; for (const_it tel = sectionlist.begin(); tel != sectionlist.end(); ++tel) {sec_prop = dynamic_cast<Section_prop *>(*tel); sec_line = dynamic_cast<Section_line *>(*tel); if (sec_prop) sec_prop->data = ""; else if (sec_line) sec_line->data = "";} }
 public:
     bool opt_log_con;
     double opt_time_limit;
@@ -124,18 +131,23 @@ public:
     std::vector<std::string> opt_c;
     std::vector<std::string> opt_set;
 
+    bool opt_used_defaultdir;
+    signed char opt_promptfolder;
     bool opt_disable_dpi_awareness;
     bool opt_disable_numlock_check;
     bool opt_date_host_forced;
     bool opt_alt_vga_render;
+    bool opt_defaultmapper;
     bool opt_fastbioslogo;
     bool opt_break_start;
     bool opt_erasemapper;
     bool opt_resetmapper;
     bool opt_startmapper;
+    bool opt_defaultconf;
     bool opt_noautoexec;
     bool opt_securemode;
     bool opt_fullscreen;
+    bool opt_fastlaunch;
     bool opt_showcycles;
     bool opt_earlydebug;
     bool opt_logfileio;
@@ -144,6 +156,7 @@ public:
     bool opt_resetconf;
     bool opt_printconf;
     bool opt_logint21;
+    bool opt_display2;
     bool opt_userconf;
     bool opt_noconfig;
     bool opt_console;

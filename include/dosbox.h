@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -119,10 +119,26 @@ enum SVGACards {
 	SVGA_ParadisePVGA1A
 };
 
+enum S3Card {
+    S3_Generic,                      // Generic emulation, minimal set
+    S3_86C928,                       // 86C928 [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%2086C928%20GUI%20Accelerator%20%281992%2d09%29%2epdf]
+    S3_Vision864,                    // Vision864 [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20Vision864%20Graphics%20Accelerator%20%281994%2d10%29%2epdf]
+    S3_Vision868,                    // Vision868 [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20Vision868%20Multimedia%20Accelerator%20%281995%2d04%29%2epdf]
+    S3_Trio32,                       // Trio32 [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20Trio32%e2%88%95Trio64%20Integrated%20Graphics%20Accelerators%20%281995%2d03%29%2epdf]
+    S3_Trio64,                       // Trio64 [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20Trio32%e2%88%95Trio64%20Integrated%20Graphics%20Accelerators%20%281995%2d03%29%2epdf]
+    S3_Trio64V,                      // Trio64V+ [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20Trio64V%2b%20Integrated%20Graphics%20and%20Video%20Accelerator%20%281995%2d07%29%2epdf]
+
+    // all cards beyond this point have S3D acceleration
+
+    S3_ViRGE,                        // ViRGE [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20ViRGE%20Integrated%203D%20Accelerator%20%281996%2d08%29%2epdf]
+    S3_ViRGEVX                       // ViRGE VX [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/VGA/SVGA/S3%20Graphics%2c%20Ltd/S3%20ViRGE%E2%88%95VX%20Integrated%203D%20Accelerator%20(1996-06).pdf]
+};
+
 typedef Bitu				(LoopHandler)(void);
 
 extern Config*				control;
 extern SVGACards			svgaCard;
+extern S3Card				s3Card;
 extern MachineType			machine;
 extern bool             SDLNetInited, uselfn;
 extern bool				mono_cga;
@@ -130,8 +146,8 @@ extern bool				DEPRECATED mainline_compatible_mapping;
 extern bool				DEPRECATED mainline_compatible_bios_mapping;
 
 #ifdef __SSE__
-extern bool				sse1_available;
 extern bool				sse2_available;
+extern bool				avx2_available;
 #endif
 
 void					MSG_Add(const char*,const char*); //add messages to the internal languagefile
@@ -171,19 +187,9 @@ unsigned long long update_clockdom_from_now(ClockDomain &dst);
 
 extern bool enable_pc98_jump;
 
-enum {
-	UTF8ERR_INVALID=-1,
-	UTF8ERR_NO_ROOM=-2
-};
-
 #ifndef UNICODE_BOM
 #define UNICODE_BOM 0xFEFF
 #endif
-
-int utf8_encode(char **ptr,const char *fence,uint32_t code);
-int utf8_decode(const char **ptr,const char *fence);
-int utf16le_encode(char **ptr,const char *fence,uint32_t code);
-int utf16le_decode(const char **ptr,const char *fence);
 
 typedef char utf8_t;
 typedef uint16_t utf16_t;
@@ -196,8 +202,8 @@ enum {
     BOOTHAX_MSDOS
 };
 
-extern Bit32u guest_msdos_LoL;
-extern Bit16u guest_msdos_mcb_chain;
+extern uint32_t guest_msdos_LoL;
+extern uint16_t guest_msdos_mcb_chain;
 extern int boothax;
 
 /* C++11 user-defined literal, to help with byte units */
@@ -293,12 +299,13 @@ public:
     static SaveState& instance();
 
    typedef std::string Error;
-    static const size_t SLOT_COUNT = 10; //slot: [0,...,SLOT_COUNT - 1]
+    static const size_t MAX_PAGE = 10, SLOT_COUNT = 10; //slot: [0,...,SLOT_COUNT - 1]
 
     void save   (size_t slot);       //throw (Error)
     void load   (size_t slot) const; //throw (Error)
     bool isEmpty(size_t slot) const;
-    std::string getName(size_t slot) const;
+    void removeState(size_t slot) const;
+    std::string getName(size_t slot, bool nl=false) const;
 
     //initialization: register relevant components on program startup
     struct Component
@@ -330,7 +337,7 @@ private:
 
     struct CompData
     {
-        CompData(Component& cmp) : comp(cmp), rawBytes(SLOT_COUNT) {}
+        CompData(Component& cmp) : comp(cmp), rawBytes(MAX_PAGE*SLOT_COUNT) {}
         Component& comp;
         std::vector<RawBytes> rawBytes;
     };

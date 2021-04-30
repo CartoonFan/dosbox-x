@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -91,6 +91,8 @@
 
 // access to a general register
 #define DRCD_REG_VAL(reg) (&cpu_regs.regs[reg].dword)
+// access to the flags register
+#define DRCD_REG_FLAGS (&cpu_regs.flags)
 // access to a segment register
 #define DRCD_SEG_VAL(seg) (&Segs.val[seg])
 // access to the physical value of a segment register/selector
@@ -112,7 +114,8 @@ enum BlockReturn {
 #endif
 	BR_Iret,
 	BR_CallBack,
-	BR_SMCBlock
+	BR_SMCBlock,
+	BR_Trap
 };
 
 // identificator to signal self-modification of the currently executed block
@@ -124,10 +127,10 @@ static void IllegalOptionDynrec(const char* msg) {
 }
 
 static struct {
-	BlockReturn (*runcode)(Bit8u*);		// points to code that can start a block
+	BlockReturn (*runcode)(uint8_t*);		// points to code that can start a block
 	Bitu callback;				// the occurred callback
 	Bitu readdata;				// spare space used when reading from memory
-	Bit32u protected_regs[8];	// space to save/restore register values
+	uint32_t protected_regs[8];	// space to save/restore register values
 } core_dynrec;
 
 
@@ -199,7 +202,7 @@ static bool winrt_warning = true;
 CacheBlockDynRec * LinkBlocks(BlockReturn ret) {
 	CacheBlockDynRec * block=NULL;
 	// the last instruction was a control flow modifying instruction
-	Bit32u temp_ip=SegPhys(cs)+reg_eip;
+	uint32_t temp_ip=SegPhys(cs)+reg_eip;
 	CodePageHandlerDynRec * temp_handler=(CodePageHandlerDynRec *)get_tlb_readhandler(temp_ip);
 	if (temp_handler->flags & PFLAG_HASCODE) {
 		// see if the target is an already translated block
@@ -263,6 +266,7 @@ Bits CPU_Core_Dynrec_Run(void) {
     }
 
 	for (;;) {
+		dosbox_allow_nonrecursive_page_fault = false;
 		// Determine the linear address of CS:EIP
 		PhysPt ip_point=SegPhys(cs)+reg_eip;
 		#if C_HEAVY_DEBUG
@@ -278,7 +282,10 @@ Bits CPU_Core_Dynrec_Run(void) {
 		}
 
 		// page doesn't contain code or is special
-		if (GCC_UNLIKELY(!chandler)) return CPU_Core_Normal_Run();
+		if (GCC_UNLIKELY(!chandler)) {
+			dosbox_allow_nonrecursive_page_fault = true;
+			return CPU_Core_Normal_Run();
+		}
 
 		// find correct Dynamic Block to run
 		CacheBlockDynRec * block=chandler->FindCacheBlock(ip_point&4095);
@@ -289,15 +296,17 @@ Bits CPU_Core_Dynrec_Run(void) {
 				// translate up to 32 instructions
 				block=CreateCacheBlock(chandler,ip_point,32);
 			} else {
+				dosbox_allow_nonrecursive_page_fault = true;
 				// let the normal core handle this instruction to avoid zero-sized blocks
 				cpu_cycles_count_t old_cycles=CPU_Cycles;
 				CPU_Cycles=1;
+				CPU_CycleLeft+=old_cycles;
 				Bits nc_retcode=CPU_Core_Normal_Run();
 				if (!nc_retcode) {
 					CPU_Cycles=old_cycles-1;
+					CPU_CycleLeft-=old_cycles;
 					continue;
 				}
-				CPU_CycleLeft+=old_cycles;
 				return nc_retcode;
 			}
 		}
@@ -306,7 +315,7 @@ run_block:
 		cache.block.running=0;
 		// now we're ready to run the dynamic code block
 //		BlockReturn ret=((BlockReturn (*)(void))(block->cache.start))();
-		BlockReturn ret=core_dynrec.runcode(block->cache.start);
+		BlockReturn ret=core_dynrec.runcode(block->cache.xstart);
 
         if (sizeof(CPU_Cycles) > 4) {
             // HACK: All dynrec cores for each processor assume CPU_Cycles is 32-bit wide.
@@ -365,25 +374,34 @@ run_block:
 			cpu.exception.which=0;
 			// fallthrough, let the normal core handle the block-modifying instruction
 		case BR_Opcode:
+#if (C_DEBUG)
+		case BR_OpcodeFull:
+#endif
 			// some instruction has been encountered that could not be translated
 			// (thus it is not part of the code block), the normal core will
 			// handle this instruction
 			CPU_CycleLeft+=CPU_Cycles;
 			CPU_Cycles=1;
+			dosbox_allow_nonrecursive_page_fault = true;
 			return CPU_Core_Normal_Run();
-
-#if (C_DEBUG)
-		case BR_OpcodeFull:
-			CPU_CycleLeft+=CPU_Cycles;
-			CPU_Cycles=1;
-			return CPU_Core_Full_Run();
-#endif
 
 		case BR_Link1:
 		case BR_Link2:
 			block=LinkBlocks(ret);
 			if (block) goto run_block;
 			break;
+
+		case BR_Trap:
+			// trapflag is set, switch to the trap-aware decoder
+	#if C_DEBUG
+	#if C_HEAVY_DEBUG
+			if (DEBUG_HeavyIsBreakpoint()) {
+				return debugCallback;
+			}
+	#endif
+	#endif
+			cpudecoder=CPU_Core_Dynrec_Trap_Run;
+			return CBRET_NONE;
 
 		default:
 			E_Exit("Invalid return code %d", ret);
@@ -402,7 +420,7 @@ Bits CPU_Core_Dynrec_Trap_Run(void) {
 
 	// trap to int1 unless the last instruction deferred this
 	// (allows hardware interrupts to be served without interaction)
-	if (!cpu.trap_skip) CPU_HW_Interrupt(1);
+	if (!cpu.trap_skip) CPU_DebugException(DBINT_STEP,reg_eip);
 
 	CPU_Cycles = oldCycles-1;
 	// continue (either the trapflag was clear anyways, or the int1 cleared it)

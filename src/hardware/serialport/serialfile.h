@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -28,21 +28,27 @@
 
 class CSerialFile : public CSerial {
 public:
-	CSerialFile(Bitu id, CommandLine* cmd);
+	CSerialFile(Bitu id, CommandLine* cmd, bool sq = false);
 	virtual ~CSerialFile();
 
 	void setRTSDTR(bool rts, bool dtr);
 	void setRTS(bool val);
 	void setDTR(bool val);
 
-	void updatePortConfig(Bit16u, Bit8u lcr);
+	void updatePortConfig(uint16_t, uint8_t lcr);
 	void updateMSR();
-	void transmitByte(Bit8u val, bool first);
+	void transmitByte(uint8_t val, bool first);
 	void setBreak(bool value);
-	void handleUpperEvent(Bit16u type);
+	void doAction();
+	void handleUpperEvent(uint16_t type);
 
 	FILE* fp = NULL;
-    std::string filename;
+	bool squote;
+	bool shellhide;
+	unsigned int timeout = 0;
+	Bitu lastUsedTick = 0;
+	std::string filename;
+	std::string actstd, acterr; // open with a program or batch script
 };
 
 #endif // INCLUDEGUARD

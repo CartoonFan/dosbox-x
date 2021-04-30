@@ -3,7 +3,7 @@
 
 
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -15,9 +15,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Library General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -92,8 +92,11 @@
 /* Define to 1 to enable MT32 emulation (x86/x86_64 only) */
 /* #undef C_MT32 */
 
-/* Define to 1 to enable NE2000 ethernet passthrough, requires libpcap */
-/* #undef C_NE2000 */
+/* Define to 1 to enable ethernet passthrough, requires libpcap */
+/* #undef C_PCAP */
+
+/* Define to 1 to enable userspace TCP/IP emulation, requires libslirp */
+/* #undef C_SLIRP */
 
 /* Define to 1 to use opengl display output support */
 //#define C_OPENGL 1
@@ -206,7 +209,7 @@
 #define PACKAGE_TARNAME "dosbox-x"
 
 /* Define to the home page for this package. */
-#define PACKAGE_URL "http://dosbox-x.software"
+#define PACKAGE_URL "https://dosbox-x.com"
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "0.82.22"

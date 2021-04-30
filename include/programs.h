@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2019  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -11,9 +11,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+ *  You should have received a copy of the GNU General Public License along
+ *  with this program; if not, write to the Free Software Foundation, Inc.,
+ *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
 
@@ -43,19 +43,21 @@ public:
 		dos=0,		// MS-DOS style /switches
 		gnu,		// GNU style --switches or -switches, switch parsing stops at --
 		gnu_getopt,	// GNU style --long or -a -b -c -d or -abcd (short as single char), switch parsing stops at --
-		either		// both dos and gnu, switch parsing stops at --
+		either,		// Both DOS and GNU styles, switch parsing stops at --
+		either_except	// Both DOS and GNU styles, except for paths to executables
 	};
 public:
 	CommandLine(int argc,char const * const argv[],enum opt_style opt=CommandLine::either);
-	CommandLine(char const * const name,char const * const cmdline,enum opt_style opt=CommandLine::either);
+	CommandLine(char const * const name,char const * const cmdline,enum opt_style opt=CommandLine::either,bool squote=false);
 	const char * GetFileName(){ return file_name.c_str();}
 
 	bool FindExist(char const * const name,bool remove=false);
-	bool FindHex(char const * const name,int & value,bool remove=false);
+	bool FindHex(char const * const name,unsigned int & value,bool remove=false);
 	bool FindInt(char const * const name,int & value,bool remove=false);
 	bool FindString(char const * const name,std::string & value,bool remove=false);
 	bool FindCommand(unsigned int which,std::string & value);
 	bool FindStringBegin(char const * const begin,std::string & value, bool remove=false);
+	bool FindStringFullBegin(char const * const begin,std::string & value, bool squote, bool remove=false);
 	bool FindStringRemain(char const * const name,std::string & value);
 	bool FindStringRemainBegin(char const * const name,std::string & value);
 	bool GetStringRemain(std::string & value);
@@ -63,7 +65,7 @@ public:
 	void FillVector(std::vector<std::string> & vector);
 	unsigned int GetCount(void);
 	void Shift(unsigned int amount=1);
-	Bit16u Get_arglength();
+	uint16_t Get_arglength();
 
 	bool BeginOpt(bool eat_argv=true);
 	bool GetOpt(std::string &name);
